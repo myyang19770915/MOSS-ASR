@@ -1,0 +1,229 @@
+<!doctype html>
+<html lang="zh-Hant-TW">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>MOSS 語音轉錄與智慧校對</title>
+  <link rel="stylesheet" href="/static/styles.css?v=13">
+  <script src="/static/app.js?v=13" defer></script>
+</head>
+<body>
+  <div class="ambient ambient-one"></div>
+  <div class="ambient ambient-two"></div>
+
+  <main class="app-shell">
+    <header class="hero">
+      <div class="brand-mark" aria-hidden="true">
+        <svg viewBox="0 0 24 24"><path d="M12 15.5a4 4 0 0 0 4-4V6a4 4 0 1 0-8 0v5.5a4 4 0 0 0 4 4Zm-6.5-4a.75.75 0 0 1 1.5 0 5 5 0 0 0 10 0 .75.75 0 0 1 1.5 0 6.5 6.5 0 0 1-5.75 6.45V21h2.5a.75.75 0 0 1 0 1.5h-6.5a.75.75 0 0 1 0-1.5h2.5v-3.05A6.5 6.5 0 0 1 5.5 11.5Z"/></svg>
+      </div>
+      <div class="hero-copy">
+        <p class="eyebrow">MOSS-TRANSCRIBE-DIARIZE</p>
+        <h1>語音轉錄與智慧校對工作台</h1>
+        <p>將長音訊轉為可用逐字稿，保留時間軸與說話人，並即時比較智慧校對差異。</p>
+      </div>
+      <div id="serviceBadge" class="service-badge checking" role="status">
+        <span class="status-dot"></span>
+        <span id="serviceText">檢查模型服務</span>
+      </div>
+    </header>
+
+    <section class="workflow" aria-label="處理流程">
+      <div class="workflow-step active" data-step="upload"><span>1</span><div><b>選擇檔案</b><small>音訊或影片</small></div></div>
+      <div class="workflow-line"></div>
+      <div class="workflow-step" data-step="transcribe"><span>2</span><div><b>語音轉錄</b><small>時間軸與說話人</small></div></div>
+      <div class="workflow-line"></div>
+      <div class="workflow-step" data-step="proofread"><span>3</span><div><b>智慧校對</b><small>串流比較差異</small></div></div>
+    </section>
+
+    <section class="surface setup-surface">
+      <div class="section-heading">
+        <div>
+          <p class="section-kicker">NEW TRANSCRIPTION</p>
+          <h2>建立轉錄工作</h2>
+        </div>
+        <span id="versionBadge" class="version-badge">API</span>
+      </div>
+
+      <form id="transcribeForm" novalidate>
+        <input id="mediaFile" name="file" type="file" accept="audio/*,video/*,.mkv,.wmv" hidden>
+        <button id="dropZone" class="drop-zone" type="button">
+          <span class="upload-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><path d="M12 16V4m0 0L7.5 8.5M12 4l4.5 4.5M5 14v4a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-4"/></svg>
+          </span>
+          <span id="dropTitle" class="drop-title">拖曳音訊／影片到這裡</span>
+          <span id="dropHint" class="drop-hint">或點擊選擇檔案 · 上限 100 MB · 最長 90 分鐘</span>
+          <span id="fileMeta" class="file-meta hidden"></span>
+        </button>
+
+        <div class="option-grid">
+          <label class="toggle-card">
+            <span class="toggle-copy"><b>時間序</b><small>產生時間戳與標準 SRT</small></span>
+            <input id="timestamps" type="checkbox" checked>
+            <span class="toggle" aria-hidden="true"></span>
+          </label>
+          <label class="toggle-card">
+            <span class="toggle-copy"><b>區分說話人</b><small>標示 [S01]、[S02] 等角色</small></span>
+            <input id="diarize" type="checkbox" checked>
+            <span class="toggle" aria-hidden="true"></span>
+          </label>
+          <label class="toggle-card proofread-card">
+            <span class="toggle-copy"><b>智慧校對</b><small>上下文修正同音與誤辨字詞</small></span>
+            <input id="proofread" type="checkbox">
+            <span class="toggle" aria-hidden="true"></span>
+          </label>
+        </div>
+
+        <div class="field-grid compact-fields">
+          <label class="field">
+            <span>熱詞與專有名詞</span>
+            <input id="hotwords" type="text" placeholder="OpenMOSS, vLLM, 人名, 產品名稱">
+            <small>以逗號分隔，會加入 ASR 提示。</small>
+          </label>
+          <label class="field">
+            <span>vLLM 服務位址</span>
+            <input id="vllmUrl" type="url" autocomplete="url" required>
+            <small>容器內預設為 http://vllm:8000。</small>
+          </label>
+        </div>
+
+        <div id="proofreadOptions" class="proofread-options hidden">
+          <div class="proofread-intro">
+            <div>
+              <p class="section-kicker">CONTEXT-AWARE REVIEW</p>
+              <h3>智慧校對設定</h3>
+            </div>
+            <p>完整轉錄後才會送出；金鑰僅用於本次請求，不儲存在瀏覽器。</p>
+          </div>
+          <div class="field-grid">
+            <label class="field">
+              <span>LiteLLM API 位址</span>
+              <input id="llmUrl" type="url" autocomplete="url">
+            </label>
+            <label class="field">
+              <span>API Key</span>
+              <span class="password-wrap">
+                <input id="llmKey" type="password" autocomplete="off" placeholder="可留空使用伺服器環境變數">
+                <button id="toggleKey" class="icon-button" type="button" aria-label="顯示或隱藏 API Key">顯示</button>
+              </span>
+            </label>
+            <label class="field">
+              <span>校對模型</span>
+              <input id="llmModel" type="text" autocomplete="off">
+            </label>
+            <label class="field">
+              <span>推理強度</span>
+              <select id="reasoningEffort">
+                <option value="none">none — 最快</option>
+                <option value="minimal">minimal</option>
+                <option value="low">low</option>
+                <option value="medium" selected>medium — 建議</option>
+                <option value="high">high — 較細緻</option>
+              </select>
+            </label>
+          </div>
+          <label class="toggle-card adaptive-card">
+            <span class="toggle-copy"><b>長文智慧加速</b><small>100 段以上自動使用 low，避免先耗時推理後才重試；關閉後會完整遵照上方推理強度。</small></span>
+            <input id="adaptiveProofread" type="checkbox" checked>
+            <span class="toggle" aria-hidden="true"></span>
+          </label>
+          <div class="connection-check">
+            <button id="testLlmButton" class="secondary-button" type="button">測試 LiteLLM 連線</button>
+            <span id="llmTestStatus" class="connection-status">建議先驗證 Key 與模型權限，再開始長音訊校對。</span>
+          </div>
+        </div>
+
+        <div id="errorBanner" class="error-banner hidden" role="alert">
+          <span aria-hidden="true">!</span>
+          <p id="errorText"></p>
+          <button id="dismissError" type="button" aria-label="關閉錯誤訊息">×</button>
+        </div>
+
+        <div class="submit-row">
+          <div class="privacy-note">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 5 6v5c0 4.7 2.9 8.6 7 10 4.1-1.4 7-5.3 7-10V6l-7-3Zm0 4a2 2 0 0 1 2 2v1h.5a.5.5 0 0 1 .5.5V15H9v-4.5a.5.5 0 0 1 .5-.5h.5V9a2 2 0 0 1 2-2Z"/></svg>
+            <span>服務僅綁定本機；上傳暫存檔會在處理後刪除。</span>
+          </div>
+          <button id="submitBtn" class="primary-button" type="submit">
+            <span id="submitText">開始轉錄</span>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
+          </button>
+        </div>
+      </form>
+
+      <div id="progressPanel" class="progress-panel hidden" aria-live="polite">
+        <div class="progress-head">
+          <div>
+            <span id="progressStage" class="progress-stage">準備中</span>
+            <strong id="statusText">正在準備工作…</strong>
+          </div>
+          <span id="progressPercent">0%</span>
+        </div>
+        <div class="progress-track"><span id="progressBar"></span></div>
+        <p id="elapsedText">已經過 0 秒</p>
+      </div>
+    </section>
+
+    <section id="resultCard" class="surface result-surface hidden" aria-live="polite">
+      <div class="result-head">
+        <div>
+          <p class="section-kicker">LIVE RESULT</p>
+          <h2>轉錄與校對結果</h2>
+          <p id="resultStats" class="result-stats">等待輸出</p>
+        </div>
+        <div class="action-group">
+          <div class="reader-controls" role="group" aria-label="結果閱讀字級">
+            <span>字級</span>
+            <button type="button" data-reader-size="compact" aria-label="較小字級" aria-pressed="false">A−</button>
+            <button type="button" data-reader-size="comfortable" aria-label="標準字級" aria-pressed="true">A</button>
+            <button type="button" data-reader-size="large" aria-label="較大字級" aria-pressed="false">A＋</button>
+          </div>
+          <button id="copyResultButton" class="secondary-button" type="button" disabled>複製結果</button>
+          <button id="downloadSrt" class="secondary-button accent" type="button" disabled>下載 SRT</button>
+          <button id="downloadJson" class="secondary-button" type="button" disabled>下載 JSON</button>
+        </div>
+      </div>
+
+      <div class="result-grid">
+        <article class="output-panel">
+          <div class="panel-head">
+            <div><span class="panel-index">01</span><h3>原始轉錄</h3></div>
+            <span id="transcriptState" class="panel-state waiting">等待轉錄</span>
+          </div>
+          <pre id="originalOutput" class="output-body"><span class="empty-copy">模型產生的原始內容會即時顯示在這裡。</span></pre>
+        </article>
+
+        <article id="proofreadPanel" class="output-panel proofread-panel hidden">
+          <div class="panel-head">
+            <div><span class="panel-index">02</span><h3>智慧校對</h3></div>
+            <span id="proofreadState" class="panel-state waiting">等待原始逐字稿</span>
+          </div>
+          <pre id="proofreadOutput" class="output-body"><span class="empty-copy">校對模型的串流內容會逐步出現在這裡。</span></pre>
+        </article>
+      </div>
+
+      <section id="diffCard" class="diff-card hidden">
+        <div class="diff-head">
+          <div>
+            <p class="section-kicker">CHANGE REVIEW</p>
+            <h3>逐段校對差異</h3>
+            <p>紅色表示原始刪除內容，綠色表示校對新增內容。</p>
+          </div>
+          <div class="diff-controls">
+            <label class="filter-toggle"><input id="changedOnly" type="checkbox"><span>只看已修改</span></label>
+            <span id="diffSummary" class="diff-summary">等待校對串流</span>
+          </div>
+        </div>
+        <div id="diffOutput" class="diff-output"></div>
+      </section>
+    </section>
+
+    <footer>
+      <span>MOSS-Transcribe-Diarize · 本機 GPU 服務</span>
+      <a href="/docs" target="_blank" rel="noopener">API 文件</a>
+    </footer>
+  </main>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+</body>
+</html>

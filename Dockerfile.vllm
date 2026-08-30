@@ -1,0 +1,20 @@
+# Official MOSS recipe: CUDA 13 vLLM base plus the model-card pinned nightly.
+FROM vllm/vllm-openai:latest-cu130
+
+RUN uv pip install --system -U vllm \
+      --torch-backend=cu130 \
+      --extra-index-url https://wheels.vllm.ai/68b4a1d582818e67adc903bf1b8fc5a5447da2fa/cu130
+
+# Keep all FlashInfer binary/JIT components aligned with the pinned nightly
+# wheel.  A version mismatch here causes model startup to fail before serving.
+RUN uv pip install --system \
+      --index-url https://flashinfer.ai/whl/ \
+      flashinfer-cubin==0.6.16.post3 \
+      --extra-index-url https://flashinfer.ai/whl/cu130/ \
+      flashinfer-jit-cache==0.6.16.post3+cu130
+
+# The OpenAI-compatible transcription endpoint loads uploads through vLLM's
+# optional audio stack.  Keep it on the same pinned vLLM/CUDA build.
+RUN uv pip install --system "vllm[audio]==0.28.0" \
+      --torch-backend=cu130 \
+      --extra-index-url https://wheels.vllm.ai/68b4a1d582818e67adc903bf1b8fc5a5447da2fa/cu130

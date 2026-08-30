@@ -1,0 +1,86 @@
+name: moss-asr
+
+services:
+  vllm:
+    build:
+      context: .
+      dockerfile: Dockerfile.vllm
+    # Pull the published image by default. Override MOSS_VLLM_IMAGE when
+    # developing a locally built image.
+    image: ${MOSS_VLLM_IMAGE:-myyang0915/moss-transcribe-diarize-vllm:cu130-vllm0.28.0}
+    container_name: moss-asr-vllm
+    restart: unless-stopped
+    gpus: all
+    ipc: host
+    ports:
+      - "127.0.0.1:${MOSS_VLLM_PORT:-18000}:8000"
+    volumes:
+      - moss-hf-cache:/root/.cache/huggingface
+      - moss-vllm-cache:/root/.cache/vllm
+    environment:
+      CUDA_VISIBLE_DEVICES: "0"
+      VLLM_WORKER_MULTIPROC_METHOD: spawn
+      # vLLM disables pinned memory on WSL2 by default.  This host's updated
+      # WSL2/CUDA stack supports it, and V1 requires it for its UVA buffers.
+      VLLM_WSL2_ENABLE_PIN_MEMORY: "1"
+      HF_XET_HIGH_PERFORMANCE: "1"
+      # Permit uploads up to 100 MiB and decode a single 90-minute clip.
+      # The decoded-audio limit is intentionally bounded to avoid runaway
+      # allocations from malformed media files.
+      VLLM_MAX_AUDIO_CLIP_FILESIZE_MB: "100"
+      VLLM_MAX_AUDIO_DECODE_DURATION_S: "5400"
+      VLLM_MAX_AUDIO_DECODE_BYTES: "536870912"
+    command:
+      - OpenMOSS-Team/MOSS-Transcribe-Diarize
+      - --trust-remote-code
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8000"
+      - --dtype
+      - bfloat16
+      - --gpu-memory-utilization
+      - "0.80"
+      - --max-model-len
+      - "131072"
+    healthcheck:
+      test: ["CMD-SHELL", "python3 -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)\""]
+      interval: 20s
+      timeout: 5s
+      retries: 18
+      start_period: 180s
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    # Pull the published API image by default. Override MOSS_API_IMAGE for
+    # local development builds.
+    image: ${MOSS_API_IMAGE:-myyang0915/moss-transcribe-diarize-api:v13}
+    container_name: moss-asr-api
+    restart: unless-stopped
+    depends_on:
+      vllm:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:${MOSS_API_PORT:-17860}:7860"
+    environment:
+      MOSS_VLLM_URL: http://vllm:8000
+      MOSS_API_PORT: "7860"
+      MOSS_MAX_UPLOAD_BYTES: ${MOSS_MAX_UPLOAD_BYTES:-104857600}
+      MOSS_MAX_CONCURRENT_JOBS: ${MOSS_MAX_CONCURRENT_JOBS:-1}
+      MOSS_CORS_ORIGINS: ${MOSS_CORS_ORIGINS:-*}
+      LITELLM_API_BASE: ${LITELLM_API_BASE:-https://litellm.my-yang.online/v1}
+      LITELLM_API_KEY: ${LITELLM_API_KEY:-}
+      LITELLM_MODEL: ${LITELLM_MODEL:-deepseek-v4-flash}
+      LITELLM_USER_AGENT: ${LITELLM_USER_AGENT:-}
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:7860/healthz', timeout=3)"]
+      interval: 20s
+      timeout: 5s
+      retries: 6
+      start_period: 15s
+
+volumes:
+  moss-hf-cache:
+  moss-vllm-cache:
