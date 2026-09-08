@@ -196,6 +196,10 @@ function renderSummary(summary) {
 
 function scoreCards(summary) {
   if (!summary) return ["整體正確率", "單位錯誤率", "Exact match", "完成樣本"].map((label, index) => `<article class="score-card ${index === 0 ? "primary" : ""}"><span>${label}</span><strong>—</strong></article>`).join("");
+  if (summary.mixed_metrics) return `<article class="score-card primary"><span>整體正確率</span><strong>—</strong><small>WER 與 CER 不可合併</small></article>
+    <article class="score-card"><span>單位錯誤率</span><strong>—</strong><small>請比較各語言列</small></article>
+    <article class="score-card"><span>Exact match</span><strong>${formatPercent(summary.exact_match_percent)}</strong></article>
+    <article class="score-card"><span>完成樣本</span><strong>${summary.samples}</strong></article>`;
   return `<article class="score-card primary"><span>整體正確率</span><strong>${formatPercent(summary.accuracy_percent)}</strong></article>
     <article class="score-card"><span>單位錯誤率</span><strong>${formatPercent(summary.error_rate * 100)}</strong></article>
     <article class="score-card"><span>Exact match</span><strong>${formatPercent(summary.exact_match_percent)}</strong></article>
@@ -233,7 +237,7 @@ async function responseText(response) {
 }
 function clearError() { $("#errorBanner").classList.add("hidden"); $("#errorText").textContent = ""; }
 function showError(message) { $("#errorText").textContent = message; $("#errorBanner").classList.remove("hidden"); }
-function formatPercent(value) { return `${Number(value || 0).toFixed(2)}%`; }
+function formatPercent(value) { return value == null ? "—" : `${Number(value).toFixed(2)}%`; }
 function scoreClass(value) { return Number(value) >= 80 ? "score-good" : "score-warn"; }
 function formatBytes(bytes) { if (!Number.isFinite(bytes) || bytes <= 0) return "0 B"; const units = ["B", "KB", "MB", "GB"]; const index = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1); return `${(bytes / 1024 ** index).toFixed(index ? 1 : 0)} ${units[index]}`; }
 function formatDuration(seconds) { const total = Math.max(0, Math.round(Number(seconds) || 0)); const minutes = Math.floor(total / 60); const remainder = total % 60; return minutes ? `${minutes} 分 ${remainder} 秒` : `${remainder} 秒`; }

@@ -81,3 +81,5 @@ def test_summary_reports_per_language_metrics():
     assert summary["samples"] == 2
     assert {item["language"] for item in summary["by_language"]} == {"zh-TW", "en"}
     assert summary["exact_match_percent"] == 50
+    assert summary["mixed_metrics"] is True
+    assert summary["accuracy_percent"] is None

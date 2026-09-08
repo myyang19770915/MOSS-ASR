@@ -265,6 +265,17 @@ def summarize_scores(rows: list[dict[str, Any]]) -> dict[str, Any]:
     language_rows = []
     for (language, _metric), group in sorted(groups.items()):
         language_rows.append(summarize(group, language))
+    metrics = {str(row["score"]["metric"]) for row in rows}
     overall = summarize(rows)
+    overall["metric"] = next(iter(metrics)) if len(metrics) == 1 else None
+    overall["mixed_metrics"] = len(metrics) > 1
+    # Word and character units are not commensurable. Preserve per-language
+    # aggregates, but do not advertise a pseudo-global WER/CER when a run
+    # contains both kinds of languages.
+    if overall["mixed_metrics"]:
+        overall["errors"] = None
+        overall["reference_units"] = None
+        overall["error_rate"] = None
+        overall["accuracy_percent"] = None
     overall["by_language"] = language_rows
     return overall

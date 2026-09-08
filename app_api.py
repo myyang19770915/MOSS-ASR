@@ -40,7 +40,7 @@ from moss_asr.benchmarking import (
 from moss_asr.vllm_client import VLLMClient
 
 
-APP_VERSION = "1.3.1"
+APP_VERSION = "1.3.2"
 MODEL_ID = "OpenMOSS-Team/MOSS-Transcribe-Diarize"
 BASE_DIR = Path(__file__).resolve().parent
 WEB_DIR = BASE_DIR / "web"
