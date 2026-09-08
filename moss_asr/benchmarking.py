@@ -154,7 +154,7 @@ def _iter_manifest_samples(manifest_path: Path, data_root: Path) -> Iterable[Ben
             reference=reference,
             language=language,
         )
- 
+
 
 def load_manifest(manifest_path: Path, data_root: Path, *, max_samples: int) -> list[BenchmarkSample]:
     """Load a bounded number of validated audio/reference pairs."""
