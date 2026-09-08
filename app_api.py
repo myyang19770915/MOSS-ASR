@@ -40,7 +40,7 @@ from moss_asr.benchmarking import (
 from moss_asr.vllm_client import VLLMClient
 
 
-APP_VERSION = "1.3.0"
+APP_VERSION = "1.3.1"
 MODEL_ID = "OpenMOSS-Team/MOSS-Transcribe-Diarize"
 BASE_DIR = Path(__file__).resolve().parent
 WEB_DIR = BASE_DIR / "web"
@@ -95,6 +95,26 @@ BENCHMARK_DATASETS = [
         "url": "https://multilingual.superbbenchmark.org/challenge-interspeech2025/data_description",
     },
 ]
+
+# MOSS/vLLM accepts ISO-like primary language codes, not dataset locales such
+# as ``en-US`` or ``cmn_Hans_CN``. Keep the locale for score reporting, but
+# only pass a supported primary hint to the model. An unknown code becomes
+# auto-detect rather than failing an entire benchmark run.
+MOSS_LANGUAGE_HINTS = {
+    "af", "ar", "hy", "az", "be", "bs", "bg", "ca", "zh", "hr", "cs", "da",
+    "nl", "en", "et", "fi", "fr", "gl", "de", "el", "he", "hi", "hu", "is",
+    "id", "it", "ja", "kn", "kk", "ko", "lv", "lt", "mk", "ms", "mr", "mi",
+    "ne", "no", "fa", "pl", "pt", "ro", "ru", "sr", "sk", "sl", "es", "sw",
+    "sv", "tl", "ta", "th", "tr", "uk", "ur", "vi", "cy",
+}
+MOSS_LANGUAGE_ALIASES = {
+    "cmn": "zh", "jpn": "ja", "kor": "ko", "tha": "th", "lao": "lo",
+    "deu": "de", "ger": "de", "fra": "fr", "fre": "fr", "spa": "es",
+    "por": "pt", "ita": "it", "nld": "nl", "dut": "nl", "pol": "pl",
+    "ron": "ro", "rum": "ro", "rus": "ru", "ukr": "uk", "vie": "vi",
+    "ces": "cs", "cze": "cs", "ell": "el", "gre": "el", "heb": "he",
+    "fas": "fa", "pes": "fa", "ind": "id", "tgl": "tl", "fil": "tl",
+}
 
 
 def _cors_origins() -> list[str]:
@@ -331,6 +351,16 @@ def _clean_benchmark_language(value: str) -> Optional[str]:
     return clean_value
 
 
+def _benchmark_language_hint(value: str) -> Optional[str]:
+    """Map dataset locales to a MOSS-supported language hint, or auto mode."""
+    clean_value = _clean_benchmark_language(value)
+    if not clean_value:
+        return None
+    primary = clean_value.lower().replace("_", "-").split("-", 1)[0]
+    hint = MOSS_LANGUAGE_ALIASES.get(primary, primary)
+    return hint if hint in MOSS_LANGUAGE_HINTS else None
+
+
 def _result_payload(
     result: Any,
     *,
@@ -546,7 +576,7 @@ async def api_benchmark_run(
             with INFERENCE_SLOTS:
                 for position, sample in enumerate(samples, start=1):
                     effective_language = selected_language or sample.language
-                    language_hint = _clean_benchmark_language(effective_language)
+                    language_hint = _benchmark_language_hint(effective_language)
                     cache_key = language_hint or "auto"
                     pipeline = pipelines.get(cache_key)
                     if pipeline is None:

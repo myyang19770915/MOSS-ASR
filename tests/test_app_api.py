@@ -154,3 +154,10 @@ def test_benchmark_run_streams_a_scored_sample(monkeypatch, tmp_path):
     assert "event: sample_complete" in events
     assert "event: complete" in events
     assert '"accuracy_percent": 100.0' in events
+
+
+def test_benchmark_language_hints_normalize_dataset_locales():
+    assert app_api._benchmark_language_hint("en-US") == "en"
+    assert app_api._benchmark_language_hint("zh-CN") == "zh"
+    assert app_api._benchmark_language_hint("cmn_Hans_CN") == "zh"
+    assert app_api._benchmark_language_hint("yue-Hant-HK") is None

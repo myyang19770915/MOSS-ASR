@@ -10,6 +10,8 @@ Place each dataset in its own folder below `benchmarks/` and provide a `.jsonl` 
 
 `audio` must be a path relative to the manifest file. Required fields are `audio` and one of `text`, `reference`, `transcript`, `sentence`, or `normalized_text`. Optional fields are `id` and `language`.
 
+Locale values such as `en-US`, `zh-CN`, and `cmn_Hans_CN` are accepted. The benchmark preserves that locale in reports, while translating it to a MOSS-supported primary language hint (`en`, `zh`) for inference. If MOSS does not support a language hint, the run falls back to automatic language detection.
+
 ## CSV format
 
 ```csv

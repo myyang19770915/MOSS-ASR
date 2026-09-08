@@ -2,7 +2,7 @@
 
 本專案針對 [OpenMOSS-Team/MOSS-Transcribe-Diarize](https://huggingface.co/OpenMOSS-Team/MOSS-Transcribe-Diarize) 開源端到端語音模型進行了深入研究與完整工程化實作。支援透過 **vLLM / SGLang** 部署服務，具備 **多格式音訊處理（MP3/WAV/M4A/MP4）**、**超長音訊自動靜音切片與時間戳對齊**、**時間序與說話人功能開關**、以及 **二階段文稿智慧校對（規則 + LLM 糾錯）**。
 
-> **目前開發基準（2026-09-08）**：Docker API 映像為 `v14`，服務版本為 API `1.3.0`。本機完整服務使用 `127.0.0.1:17860`（Web UI/API）與 `127.0.0.1:18000`（vLLM），避免佔用常見的 7860 / 8000 對外埠。新增本機掛載式多語 Benchmark 頁面；詳細的模型選型與 Whisper 比較見[附錄](#9-附錄whisper-與-moss-transcribe-diarize-的-asr-比較)。
+> **目前開發基準（2026-09-08）**：Docker API 映像為 `v14`，服務版本為 API `1.3.1`。本機完整服務使用 `127.0.0.1:17860`（Web UI/API）與 `127.0.0.1:18000`（vLLM），避免佔用常見的 7860 / 8000 對外埠。新增本機掛載式多語 Benchmark 頁面；詳細的模型選型與 Whisper 比較見[附錄](#9-附錄whisper-與-moss-transcribe-diarize-的-asr-比較)。
 
 ## Web UI 預覽
 
@@ -48,7 +48,7 @@ Web UI 預設使用 SSE 端點 `/api/transcribe/stream`：上傳完成後，MOSS
 
 `v13` 依長文操作畫面調整繁體中文排版：提高全站輔助文字、表單、狀態與按鈕字級及對比，結果正文改用中文無襯線字體、加大行距與捲軸；差異卡片同步放大並強化新增／刪除色彩。結果區新增 `A− / A / A＋` 三段閱讀字級並記住使用者選擇；靜態資源帶有版本參數，避免瀏覽器繼續使用舊版 CSS／JavaScript。
 
-`v14` 新增「多語 ASR Benchmark」頁面（`/benchmark`）：以主機掛載的本機音檔與 JSONL／CSV manifest 跑分，逐筆串流顯示參考逐字稿、轉錄輸出、WER／CER、正確率與 exact match；完成後提供依語言彙總與 JSON／CSV 下載。資料集一律唯讀掛載，測試音檔不會送往外部服務。
+`v14` 新增「多語 ASR Benchmark」頁面（`/benchmark`）：以主機掛載的本機音檔與 JSONL／CSV manifest 跑分，逐筆串流顯示參考逐字稿、轉錄輸出、WER／CER、正確率與 exact match；完成後提供依語言彙總與 JSON／CSV 下載。資料集一律唯讀掛載，測試音檔不會送往外部服務。資料集的 `en-US`、`zh-CN` 等 locale 會自動轉為 MOSS 支援的 `en`、`zh` 語言提示；無對應語言時改用模型自動偵測。
 
 > **長文校對的已知行為**：ASR 結束後的智慧校對時間主要取決於外部 LiteLLM 模型，而非 MOSS 或 RTX 5090。對 100 段以上的逐字稿，本專案會在「長文智慧加速」開啟時將 `medium/high` 降為 `low`。若所選推理模型持續輸出 reasoning 而尚未輸出 JSON，畫面會顯示已處理的推理字元；建議優先選擇 `none`、`minimal` 或 `low` 取得較低等待時間，並保留規則初稿作為即時可讀結果。
 
@@ -408,14 +408,14 @@ benchmarks/
 
 ## 8. 單元測試驗證
 
-本專案目前有 48 項 Python 自動化測試，另有前端串流／逐段差異解析測試；涵蓋音訊切片、解析器、提示詞建構、校對引擎、格式匯出、API 輸入驗證，以及 benchmark manifest／WER／CER 與逐筆 SSE 跑分：
+本專案目前有 49 項 Python 自動化測試，另有前端串流／逐段差異解析測試；涵蓋音訊切片、解析器、提示詞建構、校對引擎、格式匯出、API 輸入驗證，以及 benchmark manifest／WER／CER、locale 語言提示與逐筆 SSE 跑分：
 
 ```bash
 python3 -m pytest tests/
 ```
 
 ```text
-============================== 48 passed ==============================
+============================== 49 passed ==============================
 ```
 
 ---
