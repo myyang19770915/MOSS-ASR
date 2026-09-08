@@ -406,6 +406,18 @@ benchmarks/
 
 請保留資料集原始授權、引用與隱私條款；Benchmark 用來比較系統時，應固定測試 split、正規化方式、語言提示與解碼參數。
 
+若要快速建立本機英文基準，可下載指定數量的 LibriSpeech `validation.clean` 樣本（資料與 manifest 不會被 Git 追蹤）：
+
+```bash
+python scripts/download_librispeech_benchmark.py --destination benchmarks/librispeech-smoke --offset 3 --count 97
+```
+
+若已保留專案附帶的 6 筆 MInDS-14 多語樣本，以下指令會補齊為 100 筆、涵蓋 14 種語言；搭配上方 100 筆 LibriSpeech，即為 200 筆本機測試資料：
+
+```bash
+python scripts/download_minds14_benchmark.py --destination benchmarks/minds14-smoke
+```
+
 ---
 
 ## 8. 單元測試驗證
