@@ -374,7 +374,7 @@ python3 app_api.py
 
 ### 7.5 多語 ASR Benchmark
 
-開啟 `http://127.0.0.1:17860/benchmark` 後，可選擇已掛載的資料集、指定語言提示與評分方式，系統會依序使用同一個 MOSS/vLLM 設定轉錄，並即時計算：
+開啟 `http://127.0.0.1:17860/benchmark` 後，先選擇已掛載的資料集，再用「**資料集語言篩選**」只取某個 locale 的樣本（例如 `zh-TW`）。「**模型語言提示**」則是獨立的 ASR 提示，**不會**改變資料集選取範圍；預設自動沿用每筆 manifest 的語言。系統會依序使用同一個 MOSS/vLLM 設定轉錄，並即時計算：
 
 - **WER**：以詞為單位，適用英文與多數以空格分詞的語言。
 - **CER**：以字元為單位，預設用於中文、日文、韓文、泰文等無可靠空格分詞的語言。
@@ -403,6 +403,9 @@ benchmarks/
 - [MInDS-14](https://huggingface.co/datasets/PolyAI/minds14)：CC BY 4.0、14 種語言的客服／銀行語音，適合短句多語冒煙測試。
 - [LibriSpeech ASR](https://huggingface.co/datasets/openslr/librispeech_asr)：CC BY 4.0、英文朗讀語音，適合作為英文基準對照。
 - [ML-SUPERB 2.0](https://multilingual.superbbenchmark.org/challenge-interspeech2025/data_description)：141 語言開發集；授權依原始來源資料而定。
+- [OpenFormosa Common Voice 25 zh-TW](https://huggingface.co/datasets/OpenFormosa/common_voice_25_zh-TW)：繁體中文／台灣華語，CC0-1.0；本專案提供可重現的官方 `test` split 子集下載器。
+- [AISHELL-1](https://huggingface.co/datasets/shenyunhang/AISHELL-1)：普通話標準朗讀語料，Apache-2.0；完整語料較大，請依來源說明下載所需 split。
+- [Primewords Chinese Corpus Set 1](https://us.openslr.org/47/)：普通話行動裝置錄音，CC BY-NC-ND 4.0；使用與重發前務必確認非商業、不可改作及原始授權條件。
 
 請保留資料集原始授權、引用與隱私條款；Benchmark 用來比較系統時，應固定測試 split、正規化方式、語言提示與解碼參數。
 
@@ -417,6 +420,14 @@ python scripts/download_librispeech_benchmark.py --destination benchmarks/libris
 ```bash
 python scripts/download_minds14_benchmark.py --destination benchmarks/minds14-smoke
 ```
+
+若要建立中文優先的可重現基準，以下指令會從 OpenFormosa Common Voice 25 的官方 `test` split 下載 **500 筆繁體中文／台灣華語**音檔與參考逐字稿。完成後，在 Benchmark 頁選擇 `commonvoice-zh-tw-500/test.jsonl`，並將「資料集語言篩選」選為 `zh-TW`；音檔與 manifest 僅留在本機，並不會被 Git 或 Docker image 收錄：
+
+```bash
+python scripts/download_commonvoice_zh_tw_benchmark.py --destination benchmarks/commonvoice-zh-tw-500 --count 500
+```
+
+目前附帶的 100 筆 LibriSpeech、100 筆 MInDS-14，加上上述 500 筆中文資料，共為 **700 筆**本機 benchmark 樣本。Common Voice 是群眾錄音，仍建議另以您的會議、課程、訪談等真實場景音檔建立保留測試集，避免把公開基準成績誤當成實際使用準確率。
 
 ---
 

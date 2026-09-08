@@ -6,8 +6,8 @@
   <meta name="color-scheme" content="dark">
   <title>MOSS 多語 ASR Benchmark</title>
   <link rel="stylesheet" href="/static/styles.css?v=15">
-  <link rel="stylesheet" href="/static/benchmark.css?v=15">
-  <script src="/static/benchmark.js?v=15" defer></script>
+  <link rel="stylesheet" href="/static/benchmark.css?v=16">
+  <script src="/static/benchmark.js?v=16" defer></script>
 </head>
 <body>
   <div class="ambient ambient-one"></div>
@@ -61,7 +61,14 @@
             <small id="manifestHint">請先在主機 benchmarks/ 放入資料集與 manifest。</small>
           </label>
           <label class="field">
-            <span>語言提示</span>
+            <span>資料集語言篩選</span>
+            <select id="datasetLanguage" disabled>
+              <option value="auto">先選擇 manifest</option>
+            </select>
+            <small id="datasetLanguageHint">只會跑選定語言的樣本。</small>
+          </label>
+          <label class="field">
+            <span>模型語言提示（不篩選）</span>
             <select id="languageOverride">
               <option value="auto">自動（採用 manifest language）</option>
               <option value="zh-TW">繁體中文（zh-TW）</option>
@@ -72,7 +79,7 @@
               <option value="de">Deutsch（de）</option>
               <option value="es">Español（es）</option>
             </select>
-            <small>有明確語言時可降低辨識歧義。</small>
+            <small>只提供 ASR 辨識提示，不改變選取的資料。</small>
           </label>
           <label class="field">
             <span>評分方式</span>

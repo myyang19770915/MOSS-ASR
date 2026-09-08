@@ -42,6 +42,7 @@ def test_load_manifest_only_accepts_audio_under_data_root(tmp_path):
     assert [sample.sample_id for sample in samples] == ["zh-1", "en-1"]
     assert samples[0].language == "zh-TW"
     assert samples[1].audio_path.name == "en.wav"
+    assert [sample.sample_id for sample in load_manifest(manifest, root, max_samples=10, language="zh_TW")] == ["zh-1"]
 
     unsafe = manifest.with_name("unsafe.jsonl")
     unsafe.write_text('{"audio":"../../outside.wav","text":"unsafe"}\n', encoding="utf-8")
@@ -65,6 +66,7 @@ def test_manifest_stats_and_sample_lookup_are_safe(tmp_path):
     root, manifest = _make_manifest(tmp_path)
     stats = manifest_stats(manifest, root)
     assert stats == {"samples": 2, "languages": {"zh-TW": 1, "en": 1}}
+    assert manifest_stats(manifest, root, language="en") == {"samples": 1, "languages": {"en": 1}}
     assert find_manifest_sample(manifest, root, "en-1").audio_path.name == "en.wav"
     with pytest.raises(BenchmarkManifestError, match="找不到"):
         find_manifest_sample(manifest, root, "not-present")

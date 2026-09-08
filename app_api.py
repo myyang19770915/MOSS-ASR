@@ -43,7 +43,7 @@ from moss_asr.benchmarking import (
 from moss_asr.vllm_client import VLLMClient
 
 
-APP_VERSION = "1.4.0"
+APP_VERSION = "1.5.0"
 MODEL_ID = "OpenMOSS-Team/MOSS-Transcribe-Diarize"
 BASE_DIR = Path(__file__).resolve().parent
 WEB_DIR = BASE_DIR / "web"
@@ -66,9 +66,33 @@ SUPPORTED_EXTENSIONS = {
     ".mp4", ".mkv", ".mov", ".webm", ".avi", ".flv", ".wmv",
 }
 INFERENCE_SLOTS = threading.BoundedSemaphore(MAX_CONCURRENT_JOBS)
-MAX_BENCHMARK_SAMPLES = max(1, min(500, int(os.getenv("MOSS_MAX_BENCHMARK_SAMPLES", "200"))))
+# A complete locally mounted Common Voice zh-TW subset contains 500 rows. Keep
+# the ceiling bounded, while allowing one full split-sized run when the host
+# has time available; the UI still defaults to a short 20-row smoke test.
+MAX_BENCHMARK_SAMPLES = max(1, min(500, int(os.getenv("MOSS_MAX_BENCHMARK_SAMPLES", "500"))))
 
 BENCHMARK_DATASETS = [
+    {
+        "name": "Common Voice 25 zh-TW（OpenFormosa）",
+        "languages": "繁體中文／台灣華語（zh-TW）",
+        "license": "CC0-1.0",
+        "best_for": "本專案內建可重現 500 筆 test 子集；一般繁中 ASR 基準",
+        "url": "https://huggingface.co/datasets/OpenFormosa/common_voice_25_zh-TW",
+    },
+    {
+        "name": "AISHELL-1",
+        "languages": "普通話（Mandarin Chinese）",
+        "license": "Apache-2.0",
+        "best_for": "公開、標準化的中文朗讀語音；適合正式中文 ASR 對照",
+        "url": "https://huggingface.co/datasets/shenyunhang/AISHELL-1",
+    },
+    {
+        "name": "Primewords Chinese Corpus Set 1",
+        "languages": "普通話（行動裝置錄音）",
+        "license": "CC BY-NC-ND 4.0",
+        "best_for": "行動裝置／口語中文；使用前請確認非商業與不可改作條款",
+        "url": "https://us.openslr.org/47/",
+    },
     {
         "name": "MInDS-14",
         "languages": "14 種語言（客服／銀行語境）",
@@ -535,20 +559,33 @@ async def api_benchmark_catalog() -> Dict[str, Any]:
 
 
 @app.get("/api/benchmark/preview")
-async def api_benchmark_preview(manifest: str, limit: int = 8) -> Dict[str, Any]:
+async def api_benchmark_preview(
+    manifest: str, limit: int = 8, language: str = "auto"
+) -> Dict[str, Any]:
     """Return a safe, small preview of one locally mounted benchmark dataset."""
     try:
         preview_limit = max(1, min(30, int(limit)))
         clean_manifest = resolve_manifest_path(manifest, BENCHMARK_DATA_ROOT)
-        stats = manifest_stats(clean_manifest, BENCHMARK_DATA_ROOT)
-        samples = load_manifest(clean_manifest, BENCHMARK_DATA_ROOT, max_samples=preview_limit)
+        selected_language = _clean_benchmark_language(language)
+        all_stats = manifest_stats(clean_manifest, BENCHMARK_DATA_ROOT)
+        stats = manifest_stats(
+            clean_manifest, BENCHMARK_DATA_ROOT, language=selected_language
+        )
+        samples = load_manifest(
+            clean_manifest,
+            BENCHMARK_DATA_ROOT,
+            max_samples=preview_limit,
+            language=selected_language,
+        )
     except (BenchmarkManifestError, ValueError) as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     return {
         "manifest": manifest,
         "dataset": clean_manifest.parent.name,
         "samples": stats["samples"],
-        "languages": stats["languages"],
+        "total_samples": all_stats["samples"],
+        "languages": all_stats["languages"],
+        "selected_language": selected_language or "auto",
         "preview": [
             {
                 "id": sample.sample_id,
@@ -580,6 +617,7 @@ async def api_benchmark_run(
     manifest: str = Form(...),
     vllm_url: str = Form(DEFAULT_VLLM_URL),
     model_id: str = Form(MODEL_ID),
+    dataset_language: str = Form("auto"),
     language_override: str = Form("auto"),
     metric: str = Form("auto"),
     max_samples: int = Form(20),
@@ -590,7 +628,13 @@ async def api_benchmark_run(
         if not 1 <= max_samples <= MAX_BENCHMARK_SAMPLES:
             raise ValueError(f"單次測試筆數必須介於 1 與 {MAX_BENCHMARK_SAMPLES}")
         clean_manifest = resolve_manifest_path(manifest, BENCHMARK_DATA_ROOT)
-        samples = load_manifest(clean_manifest, BENCHMARK_DATA_ROOT, max_samples=max_samples)
+        dataset_language_filter = _clean_benchmark_language(dataset_language)
+        samples = load_manifest(
+            clean_manifest,
+            BENCHMARK_DATA_ROOT,
+            max_samples=max_samples,
+            language=dataset_language_filter,
+        )
         selected_metric = select_metric("und", metric)
         selected_language = _clean_benchmark_language(language_override)
         clean_vllm_url, clean_model_id, _, _, _, clean_max_chunk = _validate_request_options(
@@ -627,6 +671,7 @@ async def api_benchmark_run(
                 "queued",
                 {
                     "manifest": manifest,
+                    "dataset_language": dataset_language_filter or "auto",
                     "samples_total": len(samples),
                     "message": "Benchmark 已排入 GPU 佇列；將依序執行，避免影響長音訊轉錄。",
                 },
@@ -699,6 +744,7 @@ async def api_benchmark_run(
                     "metric_requested": metric,
                     "metric_default": selected_metric,
                     "language_override": selected_language or "auto",
+                    "dataset_language": dataset_language_filter or "auto",
                     "elapsed_time": time.monotonic() - started_at,
                     "summary": summary,
                     "rows": completed_rows,

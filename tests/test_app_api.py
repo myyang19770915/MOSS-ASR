@@ -140,6 +140,7 @@ def test_benchmark_run_streams_a_scored_sample(monkeypatch, tmp_path):
             manifest="smoke/test.jsonl",
             vllm_url="http://vllm:8000",
             model_id=app_api.MODEL_ID,
+            dataset_language="en",
             language_override="auto",
             metric="auto",
             max_samples=1,
@@ -169,13 +170,20 @@ def test_benchmark_preview_and_audio_only_resolve_manifest_samples(monkeypatch, 
     audio_dir = dataset / "audio"
     audio_dir.mkdir(parents=True)
     (audio_dir / "one.wav").write_bytes(b"placeholder")
+    (audio_dir / "two.wav").write_bytes(b"placeholder")
     (dataset / "test.jsonl").write_text(
-        '{"id":"one","audio":"audio/one.wav","text":"hello world","language":"en-US"}\n',
+        '\n'.join((
+            '{"id":"one","audio":"audio/one.wav","text":"hello world","language":"en-US"}',
+            '{"id":"two","audio":"audio/two.wav","text":"你好","language":"zh-TW"}',
+        )) + '\n',
         encoding="utf-8",
     )
     monkeypatch.setattr(app_api, "BENCHMARK_DATA_ROOT", root)
-    preview = asyncio.run(app_api.api_benchmark_preview("preview/test.jsonl", 8))
+    preview = asyncio.run(app_api.api_benchmark_preview("preview/test.jsonl", 8, "en_US"))
     assert preview["samples"] == 1
+    assert preview["total_samples"] == 2
+    assert preview["selected_language"] == "en_US"
+    assert preview["languages"] == {"en-US": 1, "zh-TW": 1}
     assert preview["preview"][0]["audio_url"].endswith("sample_id=one")
     response = asyncio.run(app_api.api_benchmark_audio("preview/test.jsonl", "one"))
     assert str(response.path).endswith("one.wav")

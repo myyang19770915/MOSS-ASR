@@ -27,7 +27,11 @@ async function init() {
 function bindEvents() {
   $("#benchmarkForm").addEventListener("submit", runBenchmark);
   $("#refreshCatalog").addEventListener("click", refreshCatalog);
-  $("#manifest").addEventListener("change", loadPreview);
+  $("#manifest").addEventListener("change", () => {
+    renderDatasetLanguageOptions();
+    loadPreview();
+  });
+  $("#datasetLanguage").addEventListener("change", loadPreview);
   $("#languageOverride").addEventListener("change", renderOverrideNotice);
   $("#dismissError").addEventListener("click", clearError);
   $("#downloadJson").addEventListener("click", () => download("json"));
@@ -60,6 +64,34 @@ function renderCatalog() {
   $("#manifestHint").textContent = manifests.length
     ? `找到 ${manifests.length} 個資料集 manifest，共 ${total} 筆可跑分樣本。音檔不會離開本機掛載目錄。`
     : "尚未找到 manifest。請將資料集放到 benchmarks/ 後按「重新掃描」。";
+  renderDatasetLanguageOptions();
+}
+
+function selectedManifestInfo() {
+  const manifest = $("#manifest").value;
+  return (state.catalog?.manifests || []).find((item) => item.name === manifest) || null;
+}
+
+function renderDatasetLanguageOptions() {
+  const select = $("#datasetLanguage");
+  const hint = $("#datasetLanguageHint");
+  const selected = select.value;
+  const info = selectedManifestInfo();
+  if (!info || info.invalid) {
+    select.innerHTML = '<option value="auto">先選擇 manifest</option>';
+    select.disabled = true;
+    hint.textContent = "只會跑選定語言的樣本。";
+    return;
+  }
+  const languages = Object.entries(info.languages || {}).sort(([left], [right]) => left.localeCompare(right));
+  select.disabled = false;
+  select.innerHTML = '<option value="auto">全部語言（不篩選）</option>' + languages.map(([language, count]) =>
+    `<option value="${escapeAttribute(language)}">${escapeHtml(language)} · ${formatSampleCount(count)}</option>`
+  ).join("");
+  select.value = languages.some(([language]) => language === selected) ? selected : "auto";
+  hint.textContent = languages.length
+    ? `此資料集有 ${languages.length} 種語言；選取後只跑該語言的樣本。`
+    : "此資料集沒有可用的語言標記。";
 }
 
 async function loadPreview() {
@@ -68,7 +100,8 @@ async function loadPreview() {
   $("#datasetPreview").classList.add("hidden");
   if (!manifest) return;
   try {
-    const response = await fetch(`/api/benchmark/preview?manifest=${encodeURIComponent(manifest)}&limit=8`);
+    const language = $("#datasetLanguage").value;
+    const response = await fetch(`/api/benchmark/preview?manifest=${encodeURIComponent(manifest)}&language=${encodeURIComponent(language)}&limit=8`);
     if (!response.ok) throw new Error(await responseText(response));
     state.preview = await response.json();
     renderPreview();
@@ -83,7 +116,8 @@ function renderPreview() {
   $("#datasetPreview").classList.remove("hidden");
   $("#previewTitle").textContent = preview.dataset || preview.manifest;
   const languageSummary = Object.entries(preview.languages || {}).map(([language, count]) => `${language} × ${count}`).join(" · ");
-  $("#previewMeta").textContent = `${preview.manifest} · ${languageSummary || "未標記語言"} · 顯示前 ${preview.preview.length} 筆。`;
+  const filterText = preview.selected_language === "auto" ? "全部語言" : `僅 ${preview.selected_language}`;
+  $("#previewMeta").textContent = `${preview.manifest} · ${filterText}（${formatSampleCount(preview.samples)}／共 ${formatSampleCount(preview.total_samples)}）· ${languageSummary || "未標記語言"} · 顯示前 ${preview.preview.length} 筆。`;
   $("#previewCount").textContent = formatSampleCount(preview.samples);
   $("#previewSamples").innerHTML = preview.preview.map((sample) => `<article class="preview-sample">
     <div class="preview-sample-top"><strong title="${escapeAttribute(sample.id)}">${escapeHtml(sample.id)}</strong><span>${escapeHtml(sample.language)}</span></div>
@@ -96,9 +130,13 @@ function renderPreview() {
 function renderOverrideNotice() {
   const notice = $("#languageOverrideNotice");
   const override = $("#languageOverride").value;
+  const datasetLanguage = $("#datasetLanguage").value;
   const languages = Object.keys(state.preview?.languages || {});
   const isMultilingual = languages.length > 1;
-  if (override !== "auto" && isMultilingual) {
+  if (override !== "auto" && datasetLanguage !== "auto" && override !== datasetLanguage) {
+    notice.textContent = `目前資料只篩選「${datasetLanguage}」，但模型提示指定為「${override}」。若非刻意測試錯誤提示，建議改為「自動」或相同語言。`;
+    notice.classList.remove("hidden");
+  } else if (override !== "auto" && datasetLanguage === "auto" && isMultilingual) {
     notice.textContent = `目前選擇「${override}」全域語言提示，會套用至 ${languages.length} 種資料集語言，也會影響 WER／CER 判定；若要依每筆語言跑分，請選擇「自動」。`;
     notice.classList.remove("hidden");
   } else {
@@ -127,6 +165,7 @@ async function runBenchmark(event) {
   form.append("manifest", manifest);
   form.append("vllm_url", $("#vllmUrl").value.trim());
   form.append("model_id", $("#modelId").value.trim());
+  form.append("dataset_language", $("#datasetLanguage").value);
   form.append("language_override", $("#languageOverride").value);
   form.append("metric", $("#metric").value);
   form.append("max_samples", String(maxSamples));

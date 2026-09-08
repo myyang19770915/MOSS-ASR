@@ -156,12 +156,25 @@ def _iter_manifest_samples(manifest_path: Path, data_root: Path) -> Iterable[Ben
         )
 
 
-def load_manifest(manifest_path: Path, data_root: Path, *, max_samples: int) -> list[BenchmarkSample]:
-    """Load a bounded number of validated audio/reference pairs."""
+def _same_language(left: str, right: str) -> bool:
+    """Compare locale labels without changing the label shown in reports."""
+    return left.strip().lower().replace("_", "-") == right.strip().lower().replace("_", "-")
+
+
+def load_manifest(
+    manifest_path: Path,
+    data_root: Path,
+    *,
+    max_samples: int,
+    language: str | None = None,
+) -> list[BenchmarkSample]:
+    """Load a bounded number of validated audio/reference pairs by locale."""
     if max_samples < 1:
         raise BenchmarkManifestError("測試筆數至少要是 1")
     samples: list[BenchmarkSample] = []
     for sample in _iter_manifest_samples(manifest_path, data_root):
+        if language and not _same_language(sample.language, language):
+            continue
         samples.append(sample)
         if len(samples) >= max_samples:
             break
@@ -170,11 +183,15 @@ def load_manifest(manifest_path: Path, data_root: Path, *, max_samples: int) -> 
     return samples
 
 
-def manifest_stats(manifest_path: Path, data_root: Path) -> dict[str, Any]:
+def manifest_stats(
+    manifest_path: Path, data_root: Path, *, language: str | None = None
+) -> dict[str, Any]:
     """Count validated samples and summarize languages for a mounted manifest."""
     count = 0
     languages: dict[str, int] = {}
     for sample in _iter_manifest_samples(manifest_path, data_root):
+        if language and not _same_language(sample.language, language):
+            continue
         count += 1
         languages[sample.language] = languages.get(sample.language, 0) + 1
     if not count:
