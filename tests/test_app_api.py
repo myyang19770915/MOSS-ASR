@@ -161,3 +161,21 @@ def test_benchmark_language_hints_normalize_dataset_locales():
     assert app_api._benchmark_language_hint("zh-CN") == "zh"
     assert app_api._benchmark_language_hint("cmn_Hans_CN") == "zh"
     assert app_api._benchmark_language_hint("yue-Hant-HK") is None
+
+
+def test_benchmark_preview_and_audio_only_resolve_manifest_samples(monkeypatch, tmp_path):
+    root = tmp_path / "benchmarks"
+    dataset = root / "preview"
+    audio_dir = dataset / "audio"
+    audio_dir.mkdir(parents=True)
+    (audio_dir / "one.wav").write_bytes(b"placeholder")
+    (dataset / "test.jsonl").write_text(
+        '{"id":"one","audio":"audio/one.wav","text":"hello world","language":"en-US"}\n',
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(app_api, "BENCHMARK_DATA_ROOT", root)
+    preview = asyncio.run(app_api.api_benchmark_preview("preview/test.jsonl", 8))
+    assert preview["samples"] == 1
+    assert preview["preview"][0]["audio_url"].endswith("sample_id=one")
+    response = asyncio.run(app_api.api_benchmark_audio("preview/test.jsonl", "one"))
+    assert str(response.path).endswith("one.wav")

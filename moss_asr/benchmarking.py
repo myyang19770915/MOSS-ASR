@@ -77,13 +77,16 @@ def list_manifests(data_root: Path) -> list[dict[str, Any]]:
             continue
         if len(relative.parts) > 5:
             continue
-        manifests.append(
-            {
-                "name": relative.as_posix(),
-                "format": candidate.suffix.lower().removeprefix("."),
-                "bytes": candidate.stat().st_size,
-            }
-        )
+        item: dict[str, Any] = {
+            "name": relative.as_posix(),
+            "format": candidate.suffix.lower().removeprefix("."),
+            "bytes": candidate.stat().st_size,
+        }
+        try:
+            item.update(manifest_stats(candidate, data_root))
+        except BenchmarkManifestError as exc:
+            item["invalid"] = str(exc)
+        manifests.append(item)
     return manifests[:100]
 
 
@@ -119,12 +122,9 @@ def _value(row: dict[str, Any], *keys: str) -> str:
     return ""
 
 
-def load_manifest(manifest_path: Path, data_root: Path, *, max_samples: int) -> list[BenchmarkSample]:
-    """Load validated audio/reference pairs without allowing path traversal."""
-    if max_samples < 1:
-        raise BenchmarkManifestError("測試筆數至少要是 1")
+def _iter_manifest_samples(manifest_path: Path, data_root: Path) -> Iterable[BenchmarkSample]:
+    """Yield validated samples without exposing paths outside the mounted root."""
     safe_manifest = _resolve_under_root(manifest_path, data_root, label="Manifest")
-    samples: list[BenchmarkSample] = []
     seen_ids: set[str] = set()
     for row_number, row in enumerate(_read_manifest_rows(safe_manifest), start=1):
         audio_ref = _value(row, "audio", "audio_path", "path", "file")
@@ -148,19 +148,51 @@ def load_manifest(manifest_path: Path, data_root: Path, *, max_samples: int) -> 
         language = _value(row, "language", "lang", "locale") or "und"
         if not _LANGUAGE_RE.fullmatch(language):
             raise BenchmarkManifestError(f"Manifest 第 {row_number} 筆 language 格式不正確")
-        samples.append(
-            BenchmarkSample(
-                sample_id=sample_id,
-                audio_path=audio_path,
-                reference=reference,
-                language=language,
-            )
+        yield BenchmarkSample(
+            sample_id=sample_id,
+            audio_path=audio_path,
+            reference=reference,
+            language=language,
         )
+ 
+
+def load_manifest(manifest_path: Path, data_root: Path, *, max_samples: int) -> list[BenchmarkSample]:
+    """Load a bounded number of validated audio/reference pairs."""
+    if max_samples < 1:
+        raise BenchmarkManifestError("測試筆數至少要是 1")
+    samples: list[BenchmarkSample] = []
+    for sample in _iter_manifest_samples(manifest_path, data_root):
+        samples.append(sample)
         if len(samples) >= max_samples:
             break
     if not samples:
         raise BenchmarkManifestError("Manifest 沒有可執行的測試資料")
     return samples
+
+
+def manifest_stats(manifest_path: Path, data_root: Path) -> dict[str, Any]:
+    """Count validated samples and summarize languages for a mounted manifest."""
+    count = 0
+    languages: dict[str, int] = {}
+    for sample in _iter_manifest_samples(manifest_path, data_root):
+        count += 1
+        languages[sample.language] = languages.get(sample.language, 0) + 1
+    if not count:
+        raise BenchmarkManifestError("Manifest 沒有可執行的測試資料")
+    return {"samples": count, "languages": languages}
+
+
+def find_manifest_sample(
+    manifest_path: Path, data_root: Path, sample_id: str
+) -> BenchmarkSample:
+    """Find a manifest sample by opaque ID for safe in-browser audio playback."""
+    requested_id = (sample_id or "").strip()
+    if not requested_id:
+        raise BenchmarkManifestError("請指定資料集樣本 ID")
+    for sample in _iter_manifest_samples(manifest_path, data_root):
+        if sample.sample_id == requested_id:
+            return sample
+    raise BenchmarkManifestError("找不到指定的資料集樣本")
 
 
 def normalized_text(text: str) -> str:

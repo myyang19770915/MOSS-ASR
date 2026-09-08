@@ -1,7 +1,7 @@
 "use strict";
 
 const $ = (selector) => document.querySelector(selector);
-const state = { config: null, catalog: null, rows: [], finalPayload: null, startedAt: 0, timerId: null };
+const state = { config: null, catalog: null, preview: null, activeManifest: "", rows: [], finalPayload: null, startedAt: 0, timerId: null };
 
 document.addEventListener("DOMContentLoaded", init);
 
@@ -27,6 +27,8 @@ async function init() {
 function bindEvents() {
   $("#benchmarkForm").addEventListener("submit", runBenchmark);
   $("#refreshCatalog").addEventListener("click", refreshCatalog);
+  $("#manifest").addEventListener("change", loadPreview);
+  $("#languageOverride").addEventListener("change", renderOverrideNotice);
   $("#dismissError").addEventListener("click", clearError);
   $("#downloadJson").addEventListener("click", () => download("json"));
   $("#downloadCsv").addEventListener("click", () => download("csv"));
@@ -40,6 +42,7 @@ async function refreshCatalog() {
     state.catalog = await response.json();
     renderCatalog();
     renderDatasetCards();
+    if ($("#manifest").value) await loadPreview();
   } catch (error) {
     showError(error.message || "重新掃描資料集失敗");
   } finally {
@@ -51,11 +54,57 @@ function renderCatalog() {
   const manifests = state.catalog?.manifests || [];
   const select = $("#manifest");
   select.innerHTML = '<option value="">選擇已掛載的 manifest</option>' + manifests.map((item) =>
-    `<option value="${escapeHtml(item.name)}">${escapeHtml(item.name)} · ${formatBytes(item.bytes)}</option>`
+    `<option value="${escapeHtml(item.name)}">${escapeHtml(item.name)} · ${formatSampleCount(item.samples)} · ${formatBytes(item.bytes)}${item.invalid ? " · 格式需修正" : ""}</option>`
   ).join("");
+  const total = manifests.reduce((sum, item) => sum + (Number(item.samples) || 0), 0);
   $("#manifestHint").textContent = manifests.length
-    ? `找到 ${manifests.length} 個 manifest。音檔不會離開本機掛載目錄。`
+    ? `找到 ${manifests.length} 個資料集 manifest，共 ${total} 筆可跑分樣本。音檔不會離開本機掛載目錄。`
     : "尚未找到 manifest。請將資料集放到 benchmarks/ 後按「重新掃描」。";
+}
+
+async function loadPreview() {
+  const manifest = $("#manifest").value;
+  state.preview = null;
+  $("#datasetPreview").classList.add("hidden");
+  if (!manifest) return;
+  try {
+    const response = await fetch(`/api/benchmark/preview?manifest=${encodeURIComponent(manifest)}&limit=8`);
+    if (!response.ok) throw new Error(await responseText(response));
+    state.preview = await response.json();
+    renderPreview();
+  } catch (error) {
+    showError(error.message || "無法讀取資料集預覽");
+  }
+}
+
+function renderPreview() {
+  const preview = state.preview;
+  if (!preview) return;
+  $("#datasetPreview").classList.remove("hidden");
+  $("#previewTitle").textContent = preview.dataset || preview.manifest;
+  const languageSummary = Object.entries(preview.languages || {}).map(([language, count]) => `${language} × ${count}`).join(" · ");
+  $("#previewMeta").textContent = `${preview.manifest} · ${languageSummary || "未標記語言"} · 顯示前 ${preview.preview.length} 筆。`;
+  $("#previewCount").textContent = formatSampleCount(preview.samples);
+  $("#previewSamples").innerHTML = preview.preview.map((sample) => `<article class="preview-sample">
+    <div class="preview-sample-top"><strong title="${escapeAttribute(sample.id)}">${escapeHtml(sample.id)}</strong><span>${escapeHtml(sample.language)}</span></div>
+    <p>${escapeHtml(sample.reference)}</p>
+    <audio controls preload="metadata" src="${escapeAttribute(sample.audio_url)}">此瀏覽器不支援音訊播放。</audio>
+  </article>`).join("");
+  renderOverrideNotice();
+}
+
+function renderOverrideNotice() {
+  const notice = $("#languageOverrideNotice");
+  const override = $("#languageOverride").value;
+  const languages = Object.keys(state.preview?.languages || {});
+  const isMultilingual = languages.length > 1;
+  if (override !== "auto" && isMultilingual) {
+    notice.textContent = `目前選擇「${override}」全域語言提示，會套用至 ${languages.length} 種資料集語言，也會影響 WER／CER 判定；若要依每筆語言跑分，請選擇「自動」。`;
+    notice.classList.remove("hidden");
+  } else {
+    notice.classList.add("hidden");
+    notice.textContent = "";
+  }
 }
 
 function renderDatasetCards() {
@@ -82,6 +131,7 @@ async function runBenchmark(event) {
   form.append("metric", $("#metric").value);
   form.append("max_samples", String(maxSamples));
   form.append("max_chunk_sec", $("#maxChunkSec").value);
+  state.activeManifest = manifest;
   resetRun();
   setBusy(true);
   try {
@@ -106,7 +156,7 @@ function resetRun() {
   $("#resultStats").textContent = "Benchmark 執行中";
   $("#summaryCards").innerHTML = scoreCards(null);
   $("#languageRows").innerHTML = '<tr><td colspan="6">等待首筆結果。</td></tr>';
-  $("#sampleRows").innerHTML = '<tr><td colspan="6">正在等待模型輸出。</td></tr>';
+  $("#sampleRows").innerHTML = '<tr><td colspan="7">正在等待模型輸出。</td></tr>';
   $("#downloadJson").disabled = true;
   $("#downloadCsv").disabled = true;
   updateProgress("GPU 佇列", "Benchmark 已準備完成", 0, 0, 0);
@@ -208,10 +258,15 @@ function scoreCards(summary) {
 
 function renderRows() {
   $("#sampleRows").innerHTML = state.rows.length ? state.rows.map((row, index) => `<tr>
-    <td>${index + 1}</td><td>${escapeHtml(row.language)}</td><td>${escapeHtml(row.score.metric.toUpperCase())}</td>
+    <td>${index + 1}</td><td><audio class="sample-audio" controls preload="none" src="${escapeAttribute(audioUrl(row.id))}">無法播放音檔。</audio></td>
+    <td>${escapeHtml(row.language)}</td><td>${escapeHtml(row.score.metric.toUpperCase())}</td>
     <td class="${scoreClass(row.score.accuracy_percent)}">${formatPercent(row.score.accuracy_percent)}</td>
     <td>${escapeHtml(row.reference)}</td><td>${escapeHtml(row.hypothesis)}</td>
-  </tr>`).join("") : '<tr><td colspan="6">尚無完成樣本。</td></tr>';
+  </tr>`).join("") : '<tr><td colspan="7">尚無完成樣本。</td></tr>';
+}
+
+function audioUrl(sampleId) {
+  return `/api/benchmark/audio?manifest=${encodeURIComponent(state.activeManifest)}&sample_id=${encodeURIComponent(sampleId)}`;
 }
 
 function download(format) {
@@ -240,6 +295,7 @@ function showError(message) { $("#errorText").textContent = message; $("#errorBa
 function formatPercent(value) { return value == null ? "—" : `${Number(value).toFixed(2)}%`; }
 function scoreClass(value) { return Number(value) >= 80 ? "score-good" : "score-warn"; }
 function formatBytes(bytes) { if (!Number.isFinite(bytes) || bytes <= 0) return "0 B"; const units = ["B", "KB", "MB", "GB"]; const index = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1); return `${(bytes / 1024 ** index).toFixed(index ? 1 : 0)} ${units[index]}`; }
+function formatSampleCount(value) { const count = Number(value); return Number.isFinite(count) ? `${count.toLocaleString("zh-TW")} 筆` : "樣本數未知"; }
 function formatDuration(seconds) { const total = Math.max(0, Math.round(Number(seconds) || 0)); const minutes = Math.floor(total / 60); const remainder = total % 60; return minutes ? `${minutes} 分 ${remainder} 秒` : `${remainder} 秒`; }
 function escapeHtml(value) { return String(value ?? "").replace(/[&<>"']/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[character]); }
 function escapeAttribute(value) { return escapeHtml(value); }

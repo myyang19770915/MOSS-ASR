@@ -10,6 +10,18 @@
 .benchmark-fields .field-wide { grid-column: span 3; }
 .inline-field { display: flex; gap: 10px; }
 .inline-field select { flex: 1; min-width: 0; }
+.manifest-preview { margin-top: 20px; padding: 18px; border: 1px solid rgba(79,216,232,.25); border-radius: 14px; background: rgba(11,35,51,.34); }
+.preview-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; }
+.preview-head h3 { margin: 3px 0 5px; font-size: 1.08rem; }
+.preview-head p { margin: 0; color: var(--muted); font-size: .82rem; line-height: 1.55; }
+.preview-count { flex: 0 0 auto; padding: 6px 10px; border-radius: 999px; color: #aaf2d2; background: rgba(72,213,151,.12); font-size: .8rem; font-weight: 800; }
+.preview-samples { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 15px; }
+.preview-sample { padding: 13px; border: 1px solid rgba(148,163,184,.16); border-radius: 11px; background: rgba(5,14,27,.45); }
+.preview-sample-top { display: flex; justify-content: space-between; gap: 12px; color: var(--muted); font-size: .77rem; }
+.preview-sample strong { overflow: hidden; color: #cce8ff; text-overflow: ellipsis; white-space: nowrap; }
+.preview-sample p { margin: 9px 0 10px; color: var(--muted-strong); font-size: .84rem; line-height: 1.55; }
+.preview-sample audio, .sample-audio { display: block; width: min(100%, 260px); height: 32px; }
+.override-notice { margin: 14px 0 0; padding: 10px 12px; border-left: 3px solid #ffce78; border-radius: 7px; background: rgba(255,191,72,.08); color: #ffe1a6 !important; }
 .benchmark-progress, .benchmark-results { margin-top: 22px; padding: clamp(20px, 3vw, 32px); }
 .score-cards { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin: 18px 0; }
 .score-card { min-height: 116px; padding: 17px; border: 1px solid var(--border); border-radius: 13px; background: rgba(5,14,27,.46); }
@@ -17,6 +29,7 @@
 .score-card strong { display: block; margin-top: 9px; color: #e9f3ff; font-size: clamp(1.25rem, 2.5vw, 1.8rem); font-variant-numeric: tabular-nums; }
 .score-card.primary { border-color: rgba(72,213,151,.32); background: linear-gradient(145deg, rgba(72,213,151,.12), rgba(5,14,27,.46)); }
 .score-card.primary strong { color: #aaf2d2; }
+.score-card small { display: block; margin-top: 6px; color: var(--muted); font-size: .72rem; line-height: 1.4; }
 .score-table-wrap { margin-top: 16px; overflow: hidden; border: 1px solid var(--border); border-radius: 14px; background: rgba(5,14,27,.38); }
 .table-heading { display: flex; justify-content: space-between; gap: 16px; align-items: baseline; padding: 15px 17px; border-bottom: 1px solid var(--border); }
 .table-heading h3 { margin: 0; font-size: 1rem; }
@@ -28,8 +41,8 @@
 .score-table-wrap tr:last-child td { border-bottom: 0; }
 .score-table-wrap td.score-good { color: #aaf2d2; font-weight: 750; }
 .score-table-wrap td.score-warn { color: #ffe0a1; font-weight: 750; }
-.sample-table { min-width: 1100px !important; }
-.sample-table td:nth-child(5), .sample-table td:nth-child(6) { min-width: 260px; white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.6; }
+.sample-table { min-width: 1250px !important; }
+.sample-table td:nth-child(6), .sample-table td:nth-child(7) { min-width: 260px; white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.6; }
 .dataset-section { margin-top: 22px; padding: clamp(20px, 3vw, 30px); border: 1px solid var(--border); border-radius: var(--radius); background: rgba(10,21,38,.56); }
 .dataset-section .section-heading { align-items: end; }
 .dataset-section .section-heading > span { color: var(--muted); font-size: .78rem; text-align: right; }
@@ -46,6 +59,7 @@
   .benchmark-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .benchmark-fields .field-wide { grid-column: span 2; }
   .dataset-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .preview-samples { grid-template-columns: 1fr; }
   .score-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .mount-note { grid-template-columns: auto 1fr; }
   .mount-note span { grid-column: 1 / -1; }

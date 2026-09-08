@@ -24,5 +24,7 @@ en-001,audio/en-001.wav,This is a reference transcript.,en
 - [Mozilla Common Voice](https://commonvoice.mozilla.org/datasets): diverse, crowd-sourced speech; download only the desired language and split.
 - [Google FLEURS](https://huggingface.co/datasets/google/fleurs): 102-language ASR benchmark under CC BY 4.0.
 - [VoxPopuli](https://huggingface.co/datasets/facebook/voxpopuli): 18 transcribed European languages and accented-English test data under CC0.
+- [MInDS-14](https://huggingface.co/datasets/PolyAI/minds14): 14-language customer-service speech under CC BY 4.0; useful for short multi-language smoke tests.
+- [LibriSpeech ASR](https://huggingface.co/datasets/openslr/librispeech_asr): English read speech under CC BY 4.0; useful as a conventional English ASR reference.
 
 Always keep the original dataset licence, attribution, and any speaker-privacy requirements when downloading or redistributing a subset.

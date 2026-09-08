@@ -105,6 +105,12 @@
           </label>
         </div>
 
+        <section id="datasetPreview" class="manifest-preview hidden" aria-live="polite">
+          <div class="preview-head"><div><p class="section-kicker">DATASET PREVIEW</p><h3 id="previewTitle">資料集預覽</h3><p id="previewMeta">選擇 manifest 後顯示樣本數、語言分布與可播放音檔。</p></div><span id="previewCount" class="preview-count">0 筆</span></div>
+          <p id="languageOverrideNotice" class="override-notice hidden"></p>
+          <div id="previewSamples" class="preview-samples"></div>
+        </section>
+
         <div id="errorBanner" class="error-banner hidden" role="alert">
           <span aria-hidden="true">!</span><p id="errorText"></p><button id="dismissError" type="button" aria-label="關閉錯誤訊息">×</button>
         </div>
@@ -135,7 +141,7 @@
       </section>
       <section class="score-table-wrap sample-table-wrap">
         <div class="table-heading"><h3>逐筆結果</h3><span>參考文稿與模型輸出均可用於人工檢查。</span></div>
-        <div class="table-scroll"><table class="sample-table"><thead><tr><th>#</th><th>語言</th><th>指標</th><th>正確率</th><th>參考逐字稿</th><th>模型轉錄</th></tr></thead><tbody id="sampleRows"><tr><td colspan="6">尚未執行。</td></tr></tbody></table></div>
+        <div class="table-scroll"><table class="sample-table"><thead><tr><th>#</th><th>原始音檔</th><th>語言</th><th>指標</th><th>正確率</th><th>參考逐字稿</th><th>模型轉錄</th></tr></thead><tbody id="sampleRows"><tr><td colspan="7">尚未執行。</td></tr></tbody></table></div>
       </section>
     </section>
 

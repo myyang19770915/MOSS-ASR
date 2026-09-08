@@ -9,6 +9,7 @@ import tempfile
 import threading
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 from pathlib import Path
 from typing import Any, AsyncIterator, Dict, Optional
@@ -30,8 +31,10 @@ from moss_asr import (
 from moss_asr.config import default_litellm_user_agent
 from moss_asr.benchmarking import (
     BenchmarkManifestError,
+    find_manifest_sample,
     list_manifests,
     load_manifest,
+    manifest_stats,
     resolve_manifest_path,
     score_transcript,
     select_metric,
@@ -40,7 +43,7 @@ from moss_asr.benchmarking import (
 from moss_asr.vllm_client import VLLMClient
 
 
-APP_VERSION = "1.3.2"
+APP_VERSION = "1.4.0"
 MODEL_ID = "OpenMOSS-Team/MOSS-Transcribe-Diarize"
 BASE_DIR = Path(__file__).resolve().parent
 WEB_DIR = BASE_DIR / "web"
@@ -66,6 +69,20 @@ INFERENCE_SLOTS = threading.BoundedSemaphore(MAX_CONCURRENT_JOBS)
 MAX_BENCHMARK_SAMPLES = max(1, min(500, int(os.getenv("MOSS_MAX_BENCHMARK_SAMPLES", "200"))))
 
 BENCHMARK_DATASETS = [
+    {
+        "name": "MInDS-14",
+        "languages": "14 種語言（客服／銀行語境）",
+        "license": "CC BY 4.0",
+        "best_for": "短句、多語客服指令與跨語言快速驗證",
+        "url": "https://huggingface.co/datasets/PolyAI/minds14",
+    },
+    {
+        "name": "LibriSpeech ASR",
+        "languages": "English（朗讀書籍）",
+        "license": "CC BY 4.0",
+        "best_for": "英文朗讀語音的標準 ASR 基準",
+        "url": "https://huggingface.co/datasets/openslr/librispeech_asr",
+    },
     {
         "name": "Mozilla Common Voice",
         "languages": "100+（含中文、台語、粵語、日韓與歐洲語言）",
@@ -515,6 +532,47 @@ async def api_benchmark_catalog() -> Dict[str, Any]:
         "datasets": BENCHMARK_DATASETS,
         "mount_hint": "將資料集放在主機 benchmarks/，Docker 內會以唯讀 /benchmarks 掛載。",
     }
+
+
+@app.get("/api/benchmark/preview")
+async def api_benchmark_preview(manifest: str, limit: int = 8) -> Dict[str, Any]:
+    """Return a safe, small preview of one locally mounted benchmark dataset."""
+    try:
+        preview_limit = max(1, min(30, int(limit)))
+        clean_manifest = resolve_manifest_path(manifest, BENCHMARK_DATA_ROOT)
+        stats = manifest_stats(clean_manifest, BENCHMARK_DATA_ROOT)
+        samples = load_manifest(clean_manifest, BENCHMARK_DATA_ROOT, max_samples=preview_limit)
+    except (BenchmarkManifestError, ValueError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {
+        "manifest": manifest,
+        "dataset": clean_manifest.parent.name,
+        "samples": stats["samples"],
+        "languages": stats["languages"],
+        "preview": [
+            {
+                "id": sample.sample_id,
+                "language": sample.language,
+                "reference": sample.reference,
+                "audio_url": f"/api/benchmark/audio?manifest={urllib.parse.quote(manifest, safe='')}&sample_id={urllib.parse.quote(sample.sample_id, safe='')}",
+            }
+            for sample in samples
+        ],
+    }
+
+
+@app.get("/api/benchmark/audio")
+async def api_benchmark_audio(manifest: str, sample_id: str) -> FileResponse:
+    """Stream one manifest-declared audio file; arbitrary filesystem paths are never accepted."""
+    try:
+        clean_manifest = resolve_manifest_path(manifest, BENCHMARK_DATA_ROOT)
+        sample = find_manifest_sample(clean_manifest, BENCHMARK_DATA_ROOT, sample_id)
+    except BenchmarkManifestError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return FileResponse(
+        sample.audio_path,
+        headers={"Cache-Control": "private, max-age=3600", "X-Content-Type-Options": "nosniff"},
+    )
 
 
 @app.post("/api/benchmark/run")

@@ -6,8 +6,10 @@ import pytest
 
 from moss_asr.benchmarking import (
     BenchmarkManifestError,
+    find_manifest_sample,
     list_manifests,
     load_manifest,
+    manifest_stats,
     resolve_manifest_path,
     score_transcript,
     summarize_scores,
@@ -57,6 +59,15 @@ def test_manifest_listing_is_relative_and_hides_templates(tmp_path):
     assert resolve_manifest_path("zh-en/test.jsonl", root).name == "test.jsonl"
     with pytest.raises(BenchmarkManifestError):
         resolve_manifest_path("../test.jsonl", root)
+
+
+def test_manifest_stats_and_sample_lookup_are_safe(tmp_path):
+    root, manifest = _make_manifest(tmp_path)
+    stats = manifest_stats(manifest, root)
+    assert stats == {"samples": 2, "languages": {"zh-TW": 1, "en": 1}}
+    assert find_manifest_sample(manifest, root, "en-1").audio_path.name == "en.wav"
+    with pytest.raises(BenchmarkManifestError, match="找不到"):
+        find_manifest_sample(manifest, root, "not-present")
 
 
 def test_score_transcript_uses_cer_for_chinese_and_wer_for_english():
