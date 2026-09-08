@@ -5,3 +5,10 @@ tests/
 output/
 .git/
 *.log
+
+# Benchmark audio belongs on the host volume only.  Do not accidentally bake
+# licensed or private evaluation data into a distributable image.
+benchmarks/*
+!benchmarks/.gitkeep
+!benchmarks/README.md
+!benchmarks/manifest.example.jsonl

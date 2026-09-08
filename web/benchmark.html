@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="zh-Hant-TW">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>MOSS 多語 ASR Benchmark</title>
+  <link rel="stylesheet" href="/static/styles.css?v=14">
+  <link rel="stylesheet" href="/static/benchmark.css?v=14">
+  <script src="/static/benchmark.js?v=14" defer></script>
+</head>
+<body>
+  <div class="ambient ambient-one"></div>
+  <div class="ambient ambient-two"></div>
+
+  <main class="app-shell benchmark-shell">
+    <header class="hero">
+      <div class="brand-mark" aria-hidden="true">
+        <svg viewBox="0 0 24 24"><path d="M12 15.5a4 4 0 0 0 4-4V6a4 4 0 1 0-8 0v5.5a4 4 0 0 0 4 4Zm-6.5-4a.75.75 0 0 1 1.5 0 5 5 0 0 0 10 0 .75.75 0 0 1 1.5 0 6.5 6.5 0 0 1-5.75 6.45V21h2.5a.75.75 0 0 1 0 1.5h-6.5a.75.75 0 0 1 0-1.5h2.5v-3.05A6.5 6.5 0 0 1 5.5 11.5Z"/></svg>
+      </div>
+      <div class="hero-copy">
+        <p class="eyebrow">LOCAL EVALUATION LAB</p>
+        <h1>多語 ASR Benchmark</h1>
+        <p>以含參考逐字稿的本機資料集，逐筆轉錄並量化 WER、CER、正確率與 exact match。</p>
+      </div>
+      <a class="secondary-button home-link" href="/">回到轉錄工作台</a>
+    </header>
+
+    <section class="workflow benchmark-workflow" aria-label="Benchmark 流程">
+      <div class="workflow-step active"><span>1</span><div><b>掛入資料集</b><small>音檔與 manifest</small></div></div>
+      <div class="workflow-line"></div>
+      <div class="workflow-step"><span>2</span><div><b>執行轉錄</b><small>依序使用本機 GPU</small></div></div>
+      <div class="workflow-line"></div>
+      <div class="workflow-step"><span>3</span><div><b>評分驗證</b><small>WER／CER 與摘要</small></div></div>
+    </section>
+
+    <section class="surface setup-surface benchmark-setup">
+      <div class="section-heading">
+        <div>
+          <p class="section-kicker">BENCHMARK RUN</p>
+          <h2>建立測試工作</h2>
+        </div>
+        <span id="versionBadge" class="version-badge">API</span>
+      </div>
+
+      <div class="mount-note">
+        <strong>資料集掛載位置</strong>
+        <code>./benchmarks → /benchmarks（唯讀）</code>
+        <span>每個資料集需有 JSONL 或 CSV manifest；音檔路徑必須相對於 manifest。</span>
+        <a href="https://github.com/myyang19770915/MOSS-ASR/blob/main/benchmarks/README.md" target="_blank" rel="noopener">查看 manifest 格式</a>
+      </div>
+
+      <form id="benchmarkForm" novalidate>
+        <div class="field-grid benchmark-fields">
+          <label class="field field-wide">
+            <span>已掛載的 benchmark manifest</span>
+            <div class="inline-field">
+              <select id="manifest" required><option value="">讀取資料集清單中…</option></select>
+              <button id="refreshCatalog" class="secondary-button" type="button">重新掃描</button>
+            </div>
+            <small id="manifestHint">請先在主機 benchmarks/ 放入資料集與 manifest。</small>
+          </label>
+          <label class="field">
+            <span>語言提示</span>
+            <select id="languageOverride">
+              <option value="auto">自動（採用 manifest language）</option>
+              <option value="zh-TW">繁體中文（zh-TW）</option>
+              <option value="en">English（en）</option>
+              <option value="ja">日本語（ja）</option>
+              <option value="ko">한국어（ko）</option>
+              <option value="fr">Français（fr）</option>
+              <option value="de">Deutsch（de）</option>
+              <option value="es">Español（es）</option>
+            </select>
+            <small>有明確語言時可降低辨識歧義。</small>
+          </label>
+          <label class="field">
+            <span>評分方式</span>
+            <select id="metric">
+              <option value="auto">自動（中日韓等用 CER）</option>
+              <option value="wer">WER（詞錯誤率）</option>
+              <option value="cer">CER（字元錯誤率）</option>
+            </select>
+            <small>正確率 = max(0, 100% − 錯誤率)。</small>
+          </label>
+          <label class="field">
+            <span>本次最大筆數</span>
+            <input id="maxSamples" type="number" min="1" step="1" value="20" required>
+            <small id="maxSamplesHint">先以 20 筆快速驗證，再擴大測試。</small>
+          </label>
+          <label class="field">
+            <span>單檔切片上限（秒）</span>
+            <input id="maxChunkSec" type="number" min="30" max="5400" step="30" value="1800" required>
+            <small>與一般轉錄相同，最長 90 分鐘。</small>
+          </label>
+          <label class="field">
+            <span>vLLM 服務位址</span>
+            <input id="vllmUrl" type="url" required>
+            <small>Docker 內預設為 http://vllm:8000。</small>
+          </label>
+          <label class="field">
+            <span>模型 ID</span>
+            <input id="modelId" type="text" required>
+            <small>每筆均以相同模型與解碼設定執行。</small>
+          </label>
+        </div>
+
+        <div id="errorBanner" class="error-banner hidden" role="alert">
+          <span aria-hidden="true">!</span><p id="errorText"></p><button id="dismissError" type="button" aria-label="關閉錯誤訊息">×</button>
+        </div>
+
+        <div class="submit-row">
+          <div class="privacy-note"><span>資料集僅從本機掛載目錄讀取；結果只保留在目前瀏覽器，可下載 JSON／CSV。</span></div>
+          <button id="runButton" class="primary-button" type="submit"><span id="runText">開始跑分</span></button>
+        </div>
+      </form>
+    </section>
+
+    <section id="progressPanel" class="surface benchmark-progress hidden" aria-live="polite">
+      <div class="progress-head"><div><span class="progress-stage">BENCHMARK PROGRESS</span><strong id="statusText">等待開始</strong></div><span id="progressPercent">0 / 0</span></div>
+      <div class="progress-track"><span id="progressBar"></span></div>
+      <p id="elapsedText">尚未開始</p>
+    </section>
+
+    <section id="resultCard" class="surface benchmark-results hidden" aria-live="polite">
+      <div class="result-head">
+        <div><p class="section-kicker">SCORING RESULT</p><h2>多語轉錄評分</h2><p id="resultStats" class="result-stats">等待結果</p></div>
+        <div class="action-group"><button id="downloadJson" class="secondary-button" type="button" disabled>下載 JSON</button><button id="downloadCsv" class="secondary-button accent" type="button" disabled>下載 CSV</button></div>
+      </div>
+
+      <div id="summaryCards" class="score-cards"></div>
+      <section class="score-table-wrap">
+        <div class="table-heading"><h3>依語言彙總</h3><span>採用 micro-average；不同語言會保留各自 WER／CER。</span></div>
+        <div class="table-scroll"><table><thead><tr><th>語言</th><th>指標</th><th>樣本</th><th>錯誤率</th><th>正確率</th><th>Exact match</th></tr></thead><tbody id="languageRows"><tr><td colspan="6">等待首筆結果。</td></tr></tbody></table></div>
+      </section>
+      <section class="score-table-wrap sample-table-wrap">
+        <div class="table-heading"><h3>逐筆結果</h3><span>參考文稿與模型輸出均可用於人工檢查。</span></div>
+        <div class="table-scroll"><table class="sample-table"><thead><tr><th>#</th><th>語言</th><th>指標</th><th>正確率</th><th>參考逐字稿</th><th>模型轉錄</th></tr></thead><tbody id="sampleRows"><tr><td colspan="6">尚未執行。</td></tr></tbody></table></div>
+      </section>
+    </section>
+
+    <section class="dataset-section">
+      <div class="section-heading"><div><p class="section-kicker">DATASET SOURCES</p><h2>推薦的多語 ASR 測試集</h2></div><span>請先確認各資料集授權、歸屬與隱私條款</span></div>
+      <div id="datasetCards" class="dataset-cards"><p class="empty-copy">正在載入資料集建議…</p></div>
+    </section>
+
+    <footer><span>MOSS-Transcribe-Diarize · 本機 GPU Benchmark</span><a href="/">回到轉錄工作台</a></footer>
+  </main>
+</body>
+</html>

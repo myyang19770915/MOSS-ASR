@@ -2,7 +2,7 @@
 
 本專案針對 [OpenMOSS-Team/MOSS-Transcribe-Diarize](https://huggingface.co/OpenMOSS-Team/MOSS-Transcribe-Diarize) 開源端到端語音模型進行了深入研究與完整工程化實作。支援透過 **vLLM / SGLang** 部署服務，具備 **多格式音訊處理（MP3/WAV/M4A/MP4）**、**超長音訊自動靜音切片與時間戳對齊**、**時間序與說話人功能開關**、以及 **二階段文稿智慧校對（規則 + LLM 糾錯）**。
 
-> **目前開發基準（2026-08-30）**：Docker API 映像為 `v13`，服務版本為 API `1.2.5`。本機完整服務使用 `127.0.0.1:17860`（Web UI/API）與 `127.0.0.1:18000`（vLLM），避免佔用常見的 7860 / 8000 對外埠。Python 測試 42 項與前端串流／差異解析測試均已通過。詳細的模型選型與 Whisper 比較見[附錄](#9-附錄whisper-與-moss-transcribe-diarize-的-asr-比較)。
+> **目前開發基準（2026-09-08）**：Docker API 映像為 `v14`，服務版本為 API `1.3.0`。本機完整服務使用 `127.0.0.1:17860`（Web UI/API）與 `127.0.0.1:18000`（vLLM），避免佔用常見的 7860 / 8000 對外埠。新增本機掛載式多語 Benchmark 頁面；詳細的模型選型與 Whisper 比較見[附錄](#9-附錄whisper-與-moss-transcribe-diarize-的-asr-比較)。
 
 ## Web UI 預覽
 
@@ -17,7 +17,7 @@
 | 用途 | Image | 建議 tag |
 | --- | --- | --- |
 | GPU 模型服務（CUDA 13 / RTX 5090） | [`myyang0915/moss-transcribe-diarize-vllm`](https://hub.docker.com/r/myyang0915/moss-transcribe-diarize-vllm) | `cu130-vllm0.28.0` |
-| 專案 Web UI 與 REST API | [`myyang0915/moss-transcribe-diarize-api`](https://hub.docker.com/r/myyang0915/moss-transcribe-diarize-api) | `v13` |
+| 專案 Web UI 與 REST API | [`myyang0915/moss-transcribe-diarize-api`](https://hub.docker.com/r/myyang0915/moss-transcribe-diarize-api) | `v14` |
 
 需要 Docker 的 NVIDIA GPU runtime，以及支援 CUDA 13 的 NVIDIA 驅動；不需要在 host 安裝 CUDA Toolkit。Windows 使用 Docker Desktop / WSL2 時，請保持 WSL 已更新。
 
@@ -47,6 +47,8 @@ Web UI 預設使用 SSE 端點 `/api/transcribe/stream`：上傳完成後，MOSS
 `v12` 改善長文校對速度與等待體感：規則字典／標點初稿會先顯示；推理階段持續回報處理量、請求次數與重試狀態；模型開始輸出後逐段串流差異。預設開啟「長文智慧加速」，100 段以上會直接以 `low` 執行，避免 `medium/high` 先耗盡推理內容再重試；使用者可關閉此選項以完整遵照所選推理強度。
 
 `v13` 依長文操作畫面調整繁體中文排版：提高全站輔助文字、表單、狀態與按鈕字級及對比，結果正文改用中文無襯線字體、加大行距與捲軸；差異卡片同步放大並強化新增／刪除色彩。結果區新增 `A− / A / A＋` 三段閱讀字級並記住使用者選擇；靜態資源帶有版本參數，避免瀏覽器繼續使用舊版 CSS／JavaScript。
+
+`v14` 新增「多語 ASR Benchmark」頁面（`/benchmark`）：以主機掛載的本機音檔與 JSONL／CSV manifest 跑分，逐筆串流顯示參考逐字稿、轉錄輸出、WER／CER、正確率與 exact match；完成後提供依語言彙總與 JSON／CSV 下載。資料集一律唯讀掛載，測試音檔不會送往外部服務。
 
 > **長文校對的已知行為**：ASR 結束後的智慧校對時間主要取決於外部 LiteLLM 模型，而非 MOSS 或 RTX 5090。對 100 段以上的逐字稿，本專案會在「長文智慧加速」開啟時將 `medium/high` 降為 `low`。若所選推理模型持續輸出 reasoning 而尚未輸出 JSON，畫面會顯示已處理的推理字元；建議優先選擇 `none`、`minimal` 或 `low` 取得較低等待時間，並保留規則初稿作為即時可讀結果。
 
@@ -94,6 +96,7 @@ curl http://127.0.0.1:8000/v1/audio/transcriptions \
    - [CLI 命令列工具](#cli-命令列工具)
    - [Python SDK API](#python-sdk-api)
    - [Web UI 與 REST API 服務](#web-ui-與-rest-api-服務)
+   - [多語 ASR Benchmark](#75-多語-asr-benchmark)
 8. [單元測試驗證](#8-單元測試驗證)
 9. [附錄：Whisper 與 MOSS-Transcribe-Diarize 的 ASR 比較](#9-附錄whisper-與-moss-transcribe-diarize-的-asr-比較)
 
@@ -369,18 +372,50 @@ python3 app_api.py
 - 直接執行時預設開啟：`http://localhost:7860`（可用 `MOSS_API_PORT` 覆寫）。使用本 README 的 Docker Compose 則開啟：`http://127.0.0.1:17860`。
 - 可直接在網頁上傳音訊/影片、勾選時間序/說話人/校對開關、設定熱詞並直接預覽與下載 SRT/JSON。
 
+### 7.5 多語 ASR Benchmark
+
+開啟 `http://127.0.0.1:17860/benchmark` 後，可選擇已掛載的資料集、指定語言提示與評分方式，系統會依序使用同一個 MOSS/vLLM 設定轉錄，並即時計算：
+
+- **WER**：以詞為單位，適用英文與多數以空格分詞的語言。
+- **CER**：以字元為單位，預設用於中文、日文、韓文、泰文等無可靠空格分詞的語言。
+- **正確率**：`max(0, 100% − 錯誤率)`；另顯示整句完全一致的 exact match 比例。
+
+資料集不經瀏覽器上傳。Docker Compose 會將主機的 `./benchmarks` 唯讀掛載為容器中的 `/benchmarks`。請在該資料夾建立每個資料集的目錄與 manifest；詳細格式見 [benchmarks/README.md](benchmarks/README.md)，可從 [manifest.example.jsonl](benchmarks/manifest.example.jsonl) 開始。實際 benchmark 音檔與 manifest 已排除於 Git 與 Docker build context，避免將受授權限制或私人音檔意外發布：
+
+```text
+benchmarks/
+└── fleurs-zh-tw-dev/
+    ├── test.jsonl
+    └── audio/
+        ├── 0001.wav
+        └── 0002.wav
+```
+
+```json
+{"id":"zh-0001","audio":"audio/0001.wav","text":"這是一段參考逐字稿。","language":"zh-TW"}
+```
+
+建議先以 20 筆驗證流程，再提高到完整 split。可使用下列公開資料來源並自行下載需要的語言／split：
+
+- [Mozilla Common Voice](https://commonvoice.mozilla.org/datasets)：CC0、多口音、100+ 語言，適合一般語音與繁中／台語覆蓋。
+- [Google FLEURS](https://huggingface.co/datasets/google/fleurs)：CC BY 4.0、102 語言，適合固定跨語基準。
+- [VoxPopuli](https://huggingface.co/datasets/facebook/voxpopuli)：18 種歐洲語言與多種英語口音；適合演講／議會型語料。
+- [ML-SUPERB 2.0](https://multilingual.superbbenchmark.org/challenge-interspeech2025/data_description)：141 語言開發集；授權依原始來源資料而定。
+
+請保留資料集原始授權、引用與隱私條款；Benchmark 用來比較系統時，應固定測試 split、正規化方式、語言提示與解碼參數。
+
 ---
 
 ## 8. 單元測試驗證
 
-本專案目前有 42 項 Python 自動化測試，另有前端串流／逐段差異解析測試；涵蓋音訊切片、解析器、提示詞建構、校對引擎、格式匯出與 API 輸入驗證：
+本專案目前有 48 項 Python 自動化測試，另有前端串流／逐段差異解析測試；涵蓋音訊切片、解析器、提示詞建構、校對引擎、格式匯出、API 輸入驗證，以及 benchmark manifest／WER／CER 與逐筆 SSE 跑分：
 
 ```bash
 python3 -m pytest tests/
 ```
 
 ```text
-============================== 42 passed ==============================
+============================== 48 passed ==============================
 ```
 
 ---

@@ -1,0 +1,4 @@
+# Put audio files beside this manifest (for example, benchmarks/demo/audio/001.wav).
+# `audio` is relative to this manifest. `text` is the reference transcript.
+{"id":"zh-demo-001","audio":"audio/zh-demo-001.wav","text":"這是一段繁體中文測試語音。","language":"zh-TW"}
+{"id":"en-demo-001","audio":"audio/en-demo-001.wav","text":"This is an English speech recognition test.","language":"en"}

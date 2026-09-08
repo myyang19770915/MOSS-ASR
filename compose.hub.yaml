@@ -43,7 +43,7 @@ services:
       start_period: 180s
 
   api:
-    image: myyang0915/moss-transcribe-diarize-api:v13
+    image: myyang0915/moss-transcribe-diarize-api:v14
     container_name: moss-asr-api
     restart: unless-stopped
     depends_on:
@@ -51,12 +51,18 @@ services:
         condition: service_healthy
     ports:
       - "127.0.0.1:${MOSS_API_PORT:-17860}:7860"
+    volumes:
+      # Place audio + JSONL/CSV manifests in ./benchmarks on the host.
+      # Read-only prevents a benchmark run from modifying source datasets.
+      - ${MOSS_BENCHMARK_HOST_DIR:-./benchmarks}:/benchmarks:ro
     environment:
       MOSS_VLLM_URL: http://vllm:8000
       MOSS_API_PORT: "7860"
       MOSS_MAX_UPLOAD_BYTES: ${MOSS_MAX_UPLOAD_BYTES:-104857600}
       MOSS_MAX_CONCURRENT_JOBS: ${MOSS_MAX_CONCURRENT_JOBS:-1}
       MOSS_CORS_ORIGINS: ${MOSS_CORS_ORIGINS:-*}
+      MOSS_BENCHMARK_DATA_ROOT: /benchmarks
+      MOSS_MAX_BENCHMARK_SAMPLES: ${MOSS_MAX_BENCHMARK_SAMPLES:-200}
       LITELLM_API_BASE: ${LITELLM_API_BASE:-https://litellm.my-yang.online/v1}
       LITELLM_API_KEY: ${LITELLM_API_KEY:-}
       LITELLM_MODEL: ${LITELLM_MODEL:-deepseek-v4-flash}

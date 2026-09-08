@@ -7,6 +7,7 @@ import json
 import os
 import tempfile
 import threading
+import time
 import urllib.error
 import urllib.request
 from pathlib import Path
@@ -27,15 +28,27 @@ from moss_asr import (
     TranscriptExporter,
 )
 from moss_asr.config import default_litellm_user_agent
+from moss_asr.benchmarking import (
+    BenchmarkManifestError,
+    list_manifests,
+    load_manifest,
+    resolve_manifest_path,
+    score_transcript,
+    select_metric,
+    summarize_scores,
+)
 from moss_asr.vllm_client import VLLMClient
 
 
-APP_VERSION = "1.2.5"
+APP_VERSION = "1.3.0"
 MODEL_ID = "OpenMOSS-Team/MOSS-Transcribe-Diarize"
 BASE_DIR = Path(__file__).resolve().parent
 WEB_DIR = BASE_DIR / "web"
 TEMP_UPLOAD_DIR = Path(tempfile.gettempdir()) / "moss_asr_uploads"
 TEMP_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+BENCHMARK_DATA_ROOT = Path(
+    os.getenv("MOSS_BENCHMARK_DATA_ROOT", str(BASE_DIR / "benchmarks"))
+).resolve()
 
 DEFAULT_VLLM_URL = os.getenv("MOSS_VLLM_URL", "http://127.0.0.1:18000")
 DEFAULT_LITELLM_URL = os.getenv("LITELLM_API_BASE", "https://litellm.my-yang.online/v1")
@@ -50,6 +63,38 @@ SUPPORTED_EXTENSIONS = {
     ".mp4", ".mkv", ".mov", ".webm", ".avi", ".flv", ".wmv",
 }
 INFERENCE_SLOTS = threading.BoundedSemaphore(MAX_CONCURRENT_JOBS)
+MAX_BENCHMARK_SAMPLES = max(1, min(500, int(os.getenv("MOSS_MAX_BENCHMARK_SAMPLES", "200"))))
+
+BENCHMARK_DATASETS = [
+    {
+        "name": "Mozilla Common Voice",
+        "languages": "100+（含中文、台語、粵語、日韓與歐洲語言）",
+        "license": "CC0-1.0",
+        "best_for": "多口音、群眾錄音與自訂語言小樣本",
+        "url": "https://commonvoice.mozilla.org/datasets",
+    },
+    {
+        "name": "Google FLEURS",
+        "languages": "102 種語言／10+ 語系",
+        "license": "CC BY 4.0",
+        "best_for": "固定跨語言基準與可重現比較",
+        "url": "https://huggingface.co/datasets/google/fleurs",
+    },
+    {
+        "name": "VoxPopuli",
+        "languages": "18 種歐洲語言 + 15 種英語口音",
+        "license": "CC0-1.0（請同時確認原始資料條款）",
+        "best_for": "議會／演講型長句與非母語英語口音",
+        "url": "https://huggingface.co/datasets/facebook/voxpopuli",
+    },
+    {
+        "name": "ML-SUPERB 2.0",
+        "languages": "141 種語言開發集",
+        "license": "依來源資料集而定",
+        "best_for": "低資源語言與跨語言涵蓋度研究",
+        "url": "https://multilingual.superbbenchmark.org/challenge-interspeech2025/data_description",
+    },
+]
 
 
 def _cors_origins() -> list[str]:
@@ -78,6 +123,12 @@ app.mount("/static", StaticFiles(directory=WEB_DIR), name="static")
 async def index() -> FileResponse:
     """Serve the standalone web application."""
     return FileResponse(WEB_DIR / "index.html")
+
+
+@app.get("/benchmark", response_class=FileResponse)
+async def benchmark_page() -> FileResponse:
+    """Serve the local multi-language ASR benchmark UI."""
+    return FileResponse(WEB_DIR / "benchmark.html")
 
 
 @app.get("/healthz")
@@ -109,6 +160,7 @@ async def api_config() -> Dict[str, Any]:
         "max_upload_mb": round(MAX_UPLOAD_BYTES / 1024 / 1024),
         "max_audio_minutes": 90,
         "reasoning_efforts": sorted(REASONING_EFFORTS),
+        "benchmark_max_samples": MAX_BENCHMARK_SAMPLES,
     }
 
 
@@ -215,6 +267,7 @@ def _build_pipeline(
     reasoning_effort: Optional[str],
     adaptive_proofread: bool,
     max_chunk_sec: float,
+    language: Optional[str] = None,
 ) -> MossASRPipeline:
     if ASR_ENGINE not in {"vllm", "transformers"}:
         raise RuntimeError("MOSS_ASR_ENGINE must be 'vllm' or 'transformers'.")
@@ -238,6 +291,12 @@ def _build_pipeline(
 
     effective_llm_key = (llm_key or os.getenv("LITELLM_API_KEY", "")).strip()
     hotwords_list = _parse_hotwords(hotwords)
+    clean_language = (language or "").strip()
+    if clean_language and (
+        len(clean_language) > 32
+        or not all(char.isalnum() or char in {"-", "_"} for char in clean_language)
+    ):
+        raise ValueError("language 必須是有效的語言代碼")
     config = PipelineConfig(
         audio=AudioChunkConfig(max_duration_seconds=clean_max_chunk),
         asr=ASRConfig(
@@ -246,6 +305,7 @@ def _build_pipeline(
             include_timestamps=include_timestamps,
             include_speakers=include_speakers,
             hotwords=hotwords_list,
+            language=clean_language or None,
         ),
         proofread=ProofreadConfig(
             enabled=proofread,
@@ -260,6 +320,15 @@ def _build_pipeline(
         ),
     )
     return MossASRPipeline(config=config, use_local_transformers=(ASR_ENGINE == "transformers"))
+
+
+def _clean_benchmark_language(value: str) -> Optional[str]:
+    clean_value = (value or "auto").strip()
+    if clean_value.lower() in {"", "auto", "und"}:
+        return None
+    if len(clean_value) > 32 or not all(char.isalnum() or char in {"-", "_"} for char in clean_value):
+        raise ValueError("語言代碼格式不正確")
+    return clean_value
 
 
 def _result_payload(
@@ -404,6 +473,177 @@ async def api_transcribe(
         raise _http_error(exc) from exc
     finally:
         _remove_temp_file(temp_file)
+
+
+@app.get("/api/benchmark/catalog")
+async def api_benchmark_catalog() -> Dict[str, Any]:
+    """Expose only relative benchmark manifests and public dataset references."""
+    return {
+        "manifests": list_manifests(BENCHMARK_DATA_ROOT),
+        "max_samples": MAX_BENCHMARK_SAMPLES,
+        "manifest_formats": ["jsonl", "csv"],
+        "datasets": BENCHMARK_DATASETS,
+        "mount_hint": "將資料集放在主機 benchmarks/，Docker 內會以唯讀 /benchmarks 掛載。",
+    }
+
+
+@app.post("/api/benchmark/run")
+async def api_benchmark_run(
+    manifest: str = Form(...),
+    vllm_url: str = Form(DEFAULT_VLLM_URL),
+    model_id: str = Form(MODEL_ID),
+    language_override: str = Form("auto"),
+    metric: str = Form("auto"),
+    max_samples: int = Form(20),
+    max_chunk_sec: float = Form(1800.0),
+) -> StreamingResponse:
+    """Run a local audio/reference manifest and stream per-sample ASR scores."""
+    try:
+        if not 1 <= max_samples <= MAX_BENCHMARK_SAMPLES:
+            raise ValueError(f"單次測試筆數必須介於 1 與 {MAX_BENCHMARK_SAMPLES}")
+        clean_manifest = resolve_manifest_path(manifest, BENCHMARK_DATA_ROOT)
+        samples = load_manifest(clean_manifest, BENCHMARK_DATA_ROOT, max_samples=max_samples)
+        selected_metric = select_metric("und", metric)
+        selected_language = _clean_benchmark_language(language_override)
+        clean_vllm_url, clean_model_id, _, _, _, clean_max_chunk = _validate_request_options(
+            vllm_url=vllm_url,
+            model_id=model_id,
+            proofread=False,
+            llm_url="",
+            llm_model="",
+            reasoning_effort="none",
+            max_chunk_sec=max_chunk_sec,
+        )
+    except (BenchmarkManifestError, ValueError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    loop = asyncio.get_running_loop()
+    event_queue: asyncio.Queue[Optional[tuple[str, Dict[str, Any]]]] = asyncio.Queue()
+    accepting_events = threading.Event()
+    accepting_events.set()
+
+    def publish(event: str, payload: Dict[str, Any]) -> None:
+        if not accepting_events.is_set():
+            return
+        try:
+            loop.call_soon_threadsafe(event_queue.put_nowait, (event, payload))
+        except RuntimeError:
+            accepting_events.clear()
+
+    def worker() -> None:
+        started_at = time.monotonic()
+        completed_rows: list[dict[str, Any]] = []
+        pipelines: dict[str, MossASRPipeline] = {}
+        try:
+            publish(
+                "queued",
+                {
+                    "manifest": manifest,
+                    "samples_total": len(samples),
+                    "message": "Benchmark 已排入 GPU 佇列；將依序執行，避免影響長音訊轉錄。",
+                },
+            )
+            with INFERENCE_SLOTS:
+                for position, sample in enumerate(samples, start=1):
+                    effective_language = selected_language or sample.language
+                    language_hint = _clean_benchmark_language(effective_language)
+                    cache_key = language_hint or "auto"
+                    pipeline = pipelines.get(cache_key)
+                    if pipeline is None:
+                        pipeline = _build_pipeline(
+                            vllm_url=clean_vllm_url,
+                            model_id=clean_model_id,
+                            include_timestamps=False,
+                            include_speakers=False,
+                            hotwords="",
+                            proofread=False,
+                            llm_url="",
+                            llm_key="",
+                            llm_model="",
+                            reasoning_effort="none",
+                            adaptive_proofread=False,
+                            max_chunk_sec=clean_max_chunk,
+                            language=language_hint,
+                        )
+                        pipelines[cache_key] = pipeline
+                    publish(
+                        "sample_started",
+                        {
+                            "position": position,
+                            "samples_total": len(samples),
+                            "id": sample.sample_id,
+                            "language": effective_language,
+                            "message": f"正在轉錄 {position}/{len(samples)}：{sample.sample_id}",
+                        },
+                    )
+                    result = pipeline.process(sample.audio_path)
+                    hypothesis = result.full_text
+                    score = score_transcript(
+                        sample.reference,
+                        hypothesis,
+                        language=effective_language,
+                        requested_metric=metric,
+                    )
+                    row = {
+                        "id": sample.sample_id,
+                        "language": effective_language,
+                        "reference": sample.reference,
+                        "hypothesis": hypothesis,
+                        "audio_duration": result.audio_duration,
+                        "elapsed_time": result.elapsed_time,
+                        "score": score,
+                    }
+                    completed_rows.append(row)
+                    publish(
+                        "sample_complete",
+                        {
+                            "position": position,
+                            "samples_total": len(samples),
+                            "row": row,
+                            "summary": summarize_scores(completed_rows),
+                        },
+                    )
+            summary = summarize_scores(completed_rows)
+            publish(
+                "complete",
+                {
+                    "manifest": manifest,
+                    "metric_requested": metric,
+                    "metric_default": selected_metric,
+                    "language_override": selected_language or "auto",
+                    "elapsed_time": time.monotonic() - started_at,
+                    "summary": summary,
+                    "rows": completed_rows,
+                },
+            )
+        except Exception as exc:
+            publish("error", {"detail": str(exc), "completed": len(completed_rows)})
+        finally:
+            if accepting_events.is_set():
+                loop.call_soon_threadsafe(event_queue.put_nowait, None)
+
+    threading.Thread(target=worker, name="moss-asr-benchmark", daemon=True).start()
+
+    async def event_stream() -> AsyncIterator[str]:
+        try:
+            while True:
+                item = await event_queue.get()
+                if item is None:
+                    break
+                event, payload = item
+                yield _sse_event(event, payload)
+        finally:
+            accepting_events.clear()
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache, no-transform",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
 
 
 @app.post("/api/transcribe/stream")

@@ -24,6 +24,13 @@ runs/
 results/
 uploads/
 
+# Benchmark fixtures can be licensed or private. Keep only the documented
+# empty mount point and schema example under version control.
+benchmarks/*
+!benchmarks/.gitkeep
+!benchmarks/README.md
+!benchmarks/manifest.example.jsonl
+
 # Local editor / OS files
 .vscode/
 .idea/
