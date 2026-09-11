@@ -1,8 +1,9 @@
-"""Build a 100-sample multilingual MInDS-14 benchmark in a local mount.
+"""Build a reproducible MInDS-14 benchmark in a local mount.
 
 Audio and the generated JSONL manifest are intentionally ignored by Git. The
 script fetches public, CC BY 4.0 dataset rows from Hugging Face's dataset-server
-API and balances samples across the 14 language configurations.
+API. It can balance samples across all 14 language configurations, or retrieve a
+fixed number of samples for one locale such as ``zh-CN``.
 """
 
 from __future__ import annotations
@@ -48,8 +49,23 @@ def download(url: str, destination: Path) -> None:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--destination", type=Path, required=True)
+    parser.add_argument(
+        "--config",
+        action="append",
+        choices=CONFIGS,
+        help="要下載的 MInDS-14 locale；可重複指定。未指定時涵蓋全部 14 種語言。",
+    )
+    parser.add_argument(
+        "--count",
+        type=int,
+        default=100,
+        help="此 manifest 的目標樣本數（預設：100）。",
+    )
     args = parser.parse_args()
+    if args.count < 1:
+        parser.error("--count 必須至少為 1")
     destination = args.destination.resolve()
+    configs = args.config or CONFIGS
     audio_dir = destination / "audio"
     manifest = destination / "test.jsonl"
     audio_dir.mkdir(parents=True, exist_ok=True)
@@ -61,21 +77,42 @@ def main() -> int:
 
     try:
         existing_ids: set[str] = set()
+        existing_by_config = {config: 0 for config in configs}
         if manifest.is_file():
             for line in manifest.read_text(encoding="utf-8-sig").splitlines():
                 if line.strip():
-                    existing_ids.add(str(json.loads(line).get("id", "")))
+                    entry = json.loads(line)
+                    existing_ids.add(str(entry.get("id", "")))
+                    language = str(entry.get("language", "")).strip()
+                    if language in existing_by_config:
+                        existing_by_config[language] += 1
 
-        # 10 configs receive 7 new rows and 4 receive 6: 94 new rows. Together
-        # with the six preloaded language examples this produces exactly 100 rows.
-        planned_counts = {config: 7 if index < 10 else 6 for index, config in enumerate(CONFIGS)}
+        if len(existing_ids) > args.count:
+            raise RuntimeError(
+                f"既有 manifest 已有 {len(existing_ids)} 筆，超過指定目標 {args.count} 筆；"
+                "請使用新的 destination 或提高 --count"
+            )
+
+        # Assign the requested total as evenly as possible. A single --config
+        # therefore retrieves exactly that many rows for the requested locale.
+        base_count, remainder = divmod(args.count, len(configs))
+        planned_counts = {
+            config: base_count + (1 if index < remainder else 0)
+            for index, config in enumerate(configs)
+        }
         new_entries: list[dict[str, str]] = []
-        target_total = 100
-        for config in CONFIGS:
+        target_total = args.count
+        for config in configs:
             if len(existing_ids) >= target_total:
                 break
-            offset = 1 if config in EXISTING_CONFIGS else 0
-            rows = fetch_rows(config, offset, planned_counts[config])
+            needed = max(0, planned_counts[config] - existing_by_config[config])
+            if not needed:
+                continue
+            # The legacy multilingual smoke fixture contains one hand-curated
+            # row for these locales. Its ID has no row index, so retain the
+            # historical offset only when extending that original fixture.
+            offset = 1 if destination.name == "minds14-smoke" and config in EXISTING_CONFIGS else 0
+            rows = fetch_rows(config, offset, needed)
             for item in rows:
                 row = item.get("row", {})
                 source_id = str(row.get("path") or row.get("id") or "").strip()

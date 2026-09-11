@@ -421,6 +421,12 @@ python scripts/download_librispeech_benchmark.py --destination benchmarks/libris
 python scripts/download_minds14_benchmark.py --destination benchmarks/minds14-smoke
 ```
 
+若要專門測試 MInDS-14 的中文客服語音，可建立 **50 筆 `zh-CN`（簡體中文／普通話）**獨立 manifest。此資料集的語域是銀行客服短句，與台灣繁中或長篇會議音訊不同，建議和 Common Voice zh-TW 基準分開報告：
+
+```bash
+python scripts/download_minds14_benchmark.py --destination benchmarks/minds14-zh-cn-50 --config zh-CN --count 50
+```
+
 若要建立中文優先的可重現基準，以下指令會從 OpenFormosa Common Voice 25 的官方 `test` split 下載 **500 筆繁體中文／台灣華語**音檔與參考逐字稿。完成後，在 Benchmark 頁選擇 `commonvoice-zh-tw-500/test.jsonl`，並將「資料集語言篩選」選為 `zh-TW`；音檔與 manifest 僅留在本機，並不會被 Git 或 Docker image 收錄：
 
 ```bash
