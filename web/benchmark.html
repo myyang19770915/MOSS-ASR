@@ -6,8 +6,8 @@
   <meta name="color-scheme" content="dark">
   <title>MOSS 多語 ASR Benchmark</title>
   <link rel="stylesheet" href="/static/styles.css?v=15">
-  <link rel="stylesheet" href="/static/benchmark.css?v=19">
-  <script src="/static/benchmark.js?v=19" defer></script>
+  <link rel="stylesheet" href="/static/benchmark.css?v=20">
+  <script src="/static/benchmark.js?v=20" defer></script>
 </head>
 <body>
   <div class="ambient ambient-one"></div>
@@ -20,25 +20,25 @@
       </div>
       <div class="hero-copy">
         <p class="eyebrow">LOCAL EVALUATION LAB</p>
-        <h1>多語 ASR Benchmark</h1>
-        <p>使用本機音檔與參考逐字稿，快速比較 ASR 準確率。</p>
+        <h1>驗證你的 ASR，是否真的可靠。</h1>
+        <p>選擇本機資料集；MOSS 會轉錄、比對，並優先找出最需要審查的樣本。</p>
       </div>
       <a class="secondary-button home-link" href="/">回到轉錄工作台</a>
     </header>
 
     <section class="workflow benchmark-workflow" aria-label="Pipeline 執行狀態">
-      <div class="workflow-step active" data-pipeline-step="dataset"><span>1</span><div><b>掛入資料集</b><small>音檔與 manifest</small></div></div>
+      <div class="workflow-step active" data-pipeline-step="dataset"><span>1</span><div><b>選擇真實資料</b><small>音檔與參考逐字稿</small></div></div>
       <div class="workflow-line"></div>
       <div class="workflow-step" data-pipeline-step="transcribing"><span>2</span><div><b>執行轉錄</b><small>依序使用本機 GPU</small></div></div>
       <div class="workflow-line"></div>
-      <div class="workflow-step" data-pipeline-step="scoring"><span>3</span><div><b>評分驗證</b><small>WER／CER 與摘要</small></div></div>
+      <div class="workflow-step" data-pipeline-step="scoring"><span>3</span><div><b>找出弱點</b><small>WER／CER 與樣本審查</small></div></div>
     </section>
 
     <section class="surface setup-surface benchmark-setup">
       <div class="section-heading">
         <div>
-          <p class="section-kicker">BENCHMARK RUN</p>
-          <h2>建立測試工作</h2>
+          <p class="section-kicker">MODEL QUALITY CHECK</p>
+          <h2>建立一次可靠的驗證</h2>
         </div>
         <span id="versionBadge" class="version-badge">API</span>
       </div>
@@ -50,7 +50,7 @@
 
       <form id="benchmarkForm" novalidate>
         <section class="benchmark-form-section dataset-selection">
-          <div class="form-section-head"><span class="form-step">1</span><div><h3>選擇資料集</h3><p>選擇要比較的本機 manifest。</p></div></div>
+          <div class="form-section-head"><span class="form-step">1</span><div><h3>選擇代表真實情境的資料集</h3><p>選擇要比較的本機 manifest；音檔不會離開這台機器。</p></div></div>
           <label class="field field-wide">
             <span>已掛載的 benchmark manifest</span>
             <div class="inline-field">
@@ -62,7 +62,7 @@
         </section>
 
         <section class="benchmark-form-section run-configuration">
-          <div class="form-section-head"><span class="form-step">2</span><div><h3>設定本次測試</h3><p>先從小樣本開始；預設依每筆資料的語言自動辨識。</p></div></div>
+          <div class="form-section-head"><span class="form-step">2</span><div><h3>決定這次要看多深</h3><p>先從小樣本開始；預設會依每筆資料的語言自動評分。</p></div></div>
           <div class="field-grid benchmark-primary-fields">
           <label class="field">
             <span>資料集語言篩選</span>
@@ -81,7 +81,7 @@
             <small>正確率 = max(0, 100% − 錯誤率)。</small>
           </label>
           <label class="field">
-            <span>本次最大筆數</span>
+            <span>測試筆數</span>
             <input id="maxSamples" type="number" min="1" step="1" value="20" required>
             <small id="maxSamplesHint">先以 20 筆快速驗證，再擴大測試。</small>
           </label>
@@ -121,6 +121,11 @@
           </label>
             </div>
           </details>
+          <div id="runPlan" class="run-plan" aria-live="polite">
+            <span class="run-plan-label">THIS RUN</span>
+            <strong id="runPlanTitle">先選擇資料集</strong>
+            <small id="runPlanDetail">MOSS 會在你選擇資料集後，整理這次驗證的範圍。</small>
+          </div>
         </section>
 
         <section id="datasetPreview" class="manifest-preview hidden" aria-live="polite">
@@ -151,18 +156,22 @@
 
     <section id="resultCard" class="surface benchmark-results hidden" aria-live="polite">
       <div class="result-head">
-        <div><p class="section-kicker">SCORING RESULT</p><h2>多語轉錄評分</h2><p id="resultStats" class="result-stats">等待結果</p></div>
+        <div><p class="section-kicker">SCORING RESULT</p><h2>模型品質報告</h2><p id="resultStats" class="result-stats">等待結果</p></div>
         <div class="action-group"><button id="downloadJson" class="secondary-button" type="button" disabled>下載 JSON</button><button id="downloadCsv" class="secondary-button accent" type="button" disabled>下載 CSV</button></div>
       </div>
 
-      <div class="result-section-label"><span>1</span><b>摘要</b><small>目前累積評分</small></div>
+      <div class="result-section-label"><span>1</span><b>先看結果</b><small>目前累積評分</small></div>
       <div id="summaryCards" class="score-cards"></div>
       <section class="score-table-wrap">
         <div class="table-heading"><h3><i>2</i>依語言彙總</h3><span>WER／CER 分開顯示</span></div>
         <div class="table-scroll"><table><thead><tr><th>語言</th><th>指標</th><th>樣本</th><th>錯誤率</th><th>正確率</th><th>Exact match</th></tr></thead><tbody id="languageRows"><tr><td colspan="6">等待首筆結果。</td></tr></tbody></table></div>
       </section>
       <details class="sample-results">
-        <summary><span><b>3. 逐筆檢查</b><small>音檔、參考逐字稿與模型輸出</small></span><em>展開</em></summary>
+        <summary><span><b>3. 審查需要處理的樣本</b><small>優先顯示正確率低於 80% 的輸出</small></span><em>展開</em></summary>
+        <div class="sample-review-bar">
+          <p id="reviewSummary">完成後會依正確率排序，讓問題最快浮現。</p>
+          <label class="filter-toggle"><input id="reviewOnly" type="checkbox" checked><span>只看需審查</span></label>
+        </div>
         <section class="score-table-wrap sample-table-wrap">
           <div class="table-scroll"><table class="sample-table"><thead><tr><th>#</th><th>原始音檔</th><th>語言</th><th>指標</th><th>正確率</th><th>參考逐字稿</th><th>模型轉錄</th></tr></thead><tbody id="sampleRows"><tr><td colspan="7">尚未執行。</td></tr></tbody></table></div>
         </section>

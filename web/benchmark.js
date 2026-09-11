@@ -20,6 +20,7 @@ async function init() {
     renderCatalog();
     renderDatasetCards();
     renderAdvancedSummary();
+    renderRunPlan();
     setPipelineStage("dataset");
   } catch (error) {
     showError(error.message || "初始化 Benchmark 頁面失敗");
@@ -32,15 +33,22 @@ function bindEvents() {
   $("#manifest").addEventListener("change", () => {
     renderDatasetLanguageOptions();
     updateRunAvailability();
+    renderRunPlan();
     setPipelineStage("dataset");
     loadPreview();
   });
-  $("#datasetLanguage").addEventListener("change", loadPreview);
+  $("#datasetLanguage").addEventListener("change", () => {
+    renderRunPlan();
+    loadPreview();
+  });
+  ["metric", "maxSamples"].forEach((id) => $("#" + id).addEventListener("input", renderRunPlan));
+  $("#metric").addEventListener("change", renderRunPlan);
   $("#languageOverride").addEventListener("change", renderOverrideNotice);
   ["languageOverride", "maxChunkSec", "vllmUrl", "modelId"].forEach((id) => $("#" + id).addEventListener("input", renderAdvancedSummary));
   $("#dismissError").addEventListener("click", clearError);
   $("#downloadJson").addEventListener("click", () => download("json"));
   $("#downloadCsv").addEventListener("click", () => download("csv"));
+  $("#reviewOnly").addEventListener("change", renderRows);
 }
 
 async function refreshCatalog() {
@@ -85,6 +93,24 @@ function updateRunAvailability() {
   const ready = Boolean(manifest && info && !info.invalid);
   button.disabled = !ready;
   button.title = ready ? "使用目前設定開始跑分" : "請先選擇一個 benchmark manifest";
+  renderRunPlan();
+}
+
+function renderRunPlan() {
+  const plan = $("#runPlan");
+  const info = selectedManifestInfo();
+  if (!info || info.invalid) {
+    plan.classList.remove("ready");
+    $("#runPlanTitle").textContent = "先選擇資料集";
+    $("#runPlanDetail").textContent = "MOSS 會在你選擇資料集後，整理這次驗證的範圍。";
+    return;
+  }
+  const language = $("#datasetLanguage").value === "auto" ? "所有語言" : $("#datasetLanguage").value;
+  const metric = { auto: "依語言自動選擇 WER／CER", wer: "以 WER 評分", cer: "以 CER 評分" }[$("#metric").value] || "自動評分";
+  const sampleCount = Math.max(1, Number($("#maxSamples").value) || 1);
+  plan.classList.add("ready");
+  $("#runPlanTitle").textContent = info.name + " · " + language + " · 最多 " + formatSampleCount(sampleCount);
+  $("#runPlanDetail").textContent = metric + "；完成後會先列出正確率低於 80% 的樣本。";
 }
 
 function renderAdvancedSummary() {
@@ -335,12 +361,28 @@ function scoreCards(summary) {
 }
 
 function renderRows() {
-  $("#sampleRows").innerHTML = state.rows.length ? state.rows.map((row, index) => `<tr>
+  const reviewOnly = $("#reviewOnly").checked;
+  const reviewCount = state.rows.filter((row) => Number(row.score?.accuracy_percent) < 80).length;
+  const rows = reviewRows(state.rows, reviewOnly);
+  $("#reviewSummary").textContent = state.rows.length
+    ? (reviewCount
+      ? "共 " + formatSampleCount(state.rows.length) + "；" + formatSampleCount(reviewCount) + " 需要審查，已由低至高排序。"
+      : "共 " + formatSampleCount(state.rows.length) + "；所有樣本均達 80%，依正確率排序顯示。")
+    : "完成後會依正確率排序，讓問題最快浮現。";
+  $("#sampleRows").innerHTML = rows.length ? rows.map((row, index) => `<tr>
     <td>${index + 1}</td><td><audio class="sample-audio" controls preload="none" src="${escapeAttribute(audioUrl(row.id))}">無法播放音檔。</audio></td>
     <td>${escapeHtml(row.language)}</td><td>${escapeHtml(row.score.metric.toUpperCase())}</td>
     <td class="${scoreClass(row.score.accuracy_percent)}">${formatPercent(row.score.accuracy_percent)}</td>
     <td>${escapeHtml(row.reference)}</td><td>${escapeHtml(row.hypothesis)}</td>
   </tr>`).join("") : '<tr><td colspan="7">尚無完成樣本。</td></tr>';
+}
+
+function reviewRows(rows, reviewOnly = true) {
+  const ordered = [...rows].sort((left, right) =>
+    Number(left.score?.accuracy_percent) - Number(right.score?.accuracy_percent)
+  );
+  const needsReview = ordered.filter((row) => Number(row.score?.accuracy_percent) < 80);
+  return reviewOnly && needsReview.length ? needsReview : ordered;
 }
 
 function audioUrl(sampleId) {
@@ -371,7 +413,11 @@ async function responseText(response) {
 function clearError() { $("#errorBanner").classList.add("hidden"); $("#errorText").textContent = ""; }
 function showError(message) { $("#errorText").textContent = message; $("#errorBanner").classList.remove("hidden"); }
 function formatPercent(value) { return value == null ? "—" : `${Number(value).toFixed(2)}%`; }
-function scoreClass(value) { return Number(value) >= 80 ? "score-good" : "score-warn"; }
+function scoreClass(value) {
+  const score = Number(value);
+  if (score >= 80) return "score-good";
+  return score < 60 ? "score-critical" : "score-warn";
+}
 function formatBytes(bytes) { if (!Number.isFinite(bytes) || bytes <= 0) return "0 B"; const units = ["B", "KB", "MB", "GB"]; const index = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1); return `${(bytes / 1024 ** index).toFixed(index ? 1 : 0)} ${units[index]}`; }
 function formatSampleCount(value) { const count = Number(value); return Number.isFinite(count) ? `${count.toLocaleString("zh-TW")} 筆` : "樣本數未知"; }
 function formatDuration(seconds) { const total = Math.max(0, Math.round(Number(seconds) || 0)); const minutes = Math.floor(total / 60); const remainder = total % 60; return minutes ? `${minutes} 分 ${remainder} 秒` : `${remainder} 秒`; }

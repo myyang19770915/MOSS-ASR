@@ -52,6 +52,9 @@ function bindEvents() {
   });
 
   $("#proofread").addEventListener("change", updateProofreadOptions);
+  ["timestamps", "diarize"].forEach((id) => {
+    $("#".concat(id)).addEventListener("change", updateJobSummary);
+  });
   $("#toggleKey").addEventListener("click", toggleApiKey);
   $("#testLlmButton").addEventListener("click", testLlmConnection);
   $("#dismissError").addEventListener("click", clearError);
@@ -63,6 +66,7 @@ function bindEvents() {
   document.querySelectorAll("[data-reader-size]").forEach((button) => {
     button.addEventListener("click", () => setReaderSize(button.dataset.readerSize));
   });
+  updateJobSummary();
 }
 
 function initReaderSize() {
@@ -91,7 +95,8 @@ async function loadConfig() {
     $("#llmUrl").value = state.config.litellm_url || "";
     $("#llmModel").value = state.config.litellm_model || "";
     $("#versionBadge").textContent = `API v${state.config.version}`;
-    $("#dropHint").textContent = `或點擊選擇檔案 · 上限 ${state.config.max_upload_mb} MB · 最長 ${state.config.max_audio_minutes} 分鐘`;
+    $("#dropHint").textContent = "或點擊選擇檔案 · 音訊只在本機處理 · 上限 "
+      + state.config.max_upload_mb + " MB／" + state.config.max_audio_minutes + " 分鐘";
   } catch (error) {
     showError(error.message);
   }
@@ -141,6 +146,15 @@ function updateProofreadOptions() {
   const enabled = $("#proofread").checked;
   $("#proofreadOptions").classList.toggle("hidden", !enabled);
   $("#submitText").textContent = enabled ? "開始轉錄與校對" : "開始轉錄";
+  updateJobSummary();
+}
+
+function updateJobSummary() {
+  const output = ["逐字稿"];
+  if ($("#timestamps").checked) output.push("SRT 時間軸");
+  if ($("#diarize").checked) output.push("說話人標記");
+  if ($("#proofread").checked) output.push("智慧校對");
+  $("#jobSummary").lastElementChild.textContent = "預設輸出：" + output.join("、");
 }
 
 function toggleApiKey() {

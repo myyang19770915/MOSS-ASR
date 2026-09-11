@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="dark">
   <title>MOSS 語音轉錄與智慧校對</title>
-  <link rel="stylesheet" href="/static/styles.css?v=14">
-  <script src="/static/app.js?v=14" defer></script>
+  <link rel="stylesheet" href="/static/styles.css?v=15">
+  <script src="/static/app.js?v=15" defer></script>
 </head>
 <body>
   <div class="ambient ambient-one"></div>
@@ -19,8 +19,8 @@
       </div>
       <div class="hero-copy">
         <p class="eyebrow">MOSS-TRANSCRIBE-DIARIZE</p>
-        <h1>語音轉錄與智慧校對工作台</h1>
-        <p>將長音訊轉為可用逐字稿，保留時間軸與說話人，並即時比較智慧校對差異。</p>
+        <h1>把聲音，<span class="headline-delivery">變成可交付的文字。</span></h1>
+        <p>上傳音訊或影片；MOSS 在本機完成轉錄，讓你取得可讀、可搜尋、可匯出的逐字稿。</p>
       </div>
       <div id="serviceBadge" class="service-badge checking" role="status">
         <span class="status-dot"></span>
@@ -31,16 +31,16 @@
     <section class="workflow" aria-label="處理流程">
       <div class="workflow-step active" data-step="upload"><span>1</span><div><b>選擇檔案</b><small>音訊或影片</small></div></div>
       <div class="workflow-line"></div>
-      <div class="workflow-step" data-step="transcribe"><span>2</span><div><b>語音轉錄</b><small>時間軸與說話人</small></div></div>
+      <div class="workflow-step" data-step="transcribe"><span>2</span><div><b>取得逐字稿</b><small>即時顯示轉錄進度</small></div></div>
       <div class="workflow-line"></div>
-      <div class="workflow-step" data-step="proofread"><span>3</span><div><b>智慧校對</b><small>串流比較差異</small></div></div>
+      <div class="workflow-step" data-step="proofread"><span>3</span><div><b>檢查並交付</b><small>可選智慧校對與匯出</small></div></div>
     </section>
 
     <section class="surface setup-surface">
       <div class="section-heading">
         <div>
-          <p class="section-kicker">NEW TRANSCRIPTION</p>
-          <h2>建立轉錄工作</h2>
+          <p class="section-kicker">NEW TRANSCRIPT</p>
+          <h2>把音檔拖進來</h2>
         </div>
         <span id="versionBadge" class="version-badge">API</span>
       </div>
@@ -52,40 +52,35 @@
             <svg viewBox="0 0 24 24"><path d="M12 16V4m0 0L7.5 8.5M12 4l4.5 4.5M5 14v4a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-4"/></svg>
           </span>
           <span id="dropTitle" class="drop-title">拖曳音訊／影片到這裡</span>
-          <span id="dropHint" class="drop-hint">或點擊選擇檔案 · 上限 100 MB · 最長 90 分鐘</span>
+          <span id="dropHint" class="drop-hint">或點擊選擇檔案 · 音訊只在本機處理 · 上限 100 MB／90 分鐘</span>
           <span id="fileMeta" class="file-meta hidden"></span>
         </button>
 
-        <div class="option-grid">
-          <label class="toggle-card">
-            <span class="toggle-copy"><b>時間序</b><small>產生時間戳與標準 SRT</small></span>
-            <input id="timestamps" type="checkbox" checked>
-            <span class="toggle" aria-hidden="true"></span>
-          </label>
-          <label class="toggle-card">
-            <span class="toggle-copy"><b>區分說話人</b><small>標示 [S01]、[S02] 等角色</small></span>
-            <input id="diarize" type="checkbox" checked>
-            <span class="toggle" aria-hidden="true"></span>
-          </label>
-          <label class="toggle-card proofread-card">
-            <span class="toggle-copy"><b>智慧校對</b><small>上下文修正同音與誤辨字詞</small></span>
-            <input id="proofread" type="checkbox">
-            <span class="toggle" aria-hidden="true"></span>
-          </label>
+        <div id="jobSummary" class="job-summary" role="status">
+          <span class="summary-dot" aria-hidden="true"></span>
+          <span>預設輸出：逐字稿、SRT 時間軸與說話人標記</span>
         </div>
 
-        <div class="field-grid compact-fields">
-          <label class="field">
-            <span>熱詞與專有名詞</span>
-            <input id="hotwords" type="text" placeholder="OpenMOSS, vLLM, 人名, 產品名稱">
-            <small>以逗號分隔，會加入 ASR 提示。</small>
-          </label>
-          <label class="field">
-            <span>vLLM 服務位址</span>
-            <input id="vllmUrl" type="url" autocomplete="url" required>
-            <small>容器內預設為 http://vllm:8000。</small>
-          </label>
-        </div>
+        <details class="preference-details">
+          <summary><span>輸出偏好</span><small>時間軸、說話人、智慧校對</small></summary>
+          <div class="option-grid">
+            <label class="toggle-card">
+              <span class="toggle-copy"><b>時間軸</b><small>產生時間戳與標準 SRT</small></span>
+              <input id="timestamps" type="checkbox" checked>
+              <span class="toggle" aria-hidden="true"></span>
+            </label>
+            <label class="toggle-card">
+              <span class="toggle-copy"><b>區分說話人</b><small>標示 [S01]、[S02] 等角色</small></span>
+              <input id="diarize" type="checkbox" checked>
+              <span class="toggle" aria-hidden="true"></span>
+            </label>
+            <label class="toggle-card proofread-card">
+              <span class="toggle-copy"><b>智慧校對</b><small>用上下文修正同音與誤辨字詞</small></span>
+              <input id="proofread" type="checkbox">
+              <span class="toggle" aria-hidden="true"></span>
+            </label>
+          </div>
+        </details>
 
         <div id="proofreadOptions" class="proofread-options hidden">
           <div class="proofread-intro">
@@ -132,6 +127,22 @@
             <span id="llmTestStatus" class="connection-status">建議先驗證 Key 與模型權限，再開始長音訊校對。</span>
           </div>
         </div>
+
+        <details class="engine-details">
+          <summary><span>進階設定</span><small>熱詞、模型服務與連線</small></summary>
+          <div class="field-grid compact-fields">
+            <label class="field">
+              <span>熱詞與專有名詞</span>
+              <input id="hotwords" type="text" placeholder="OpenMOSS, vLLM, 人名, 產品名稱">
+              <small>以逗號分隔，會加入 ASR 提示。</small>
+            </label>
+            <label class="field">
+              <span>vLLM 服務位址</span>
+              <input id="vllmUrl" type="url" autocomplete="url" required>
+              <small>預設已設定；只有連到其他模型服務時才需變更。</small>
+            </label>
+          </div>
+        </details>
 
         <div id="errorBanner" class="error-banner hidden" role="alert">
           <span aria-hidden="true">!</span>
