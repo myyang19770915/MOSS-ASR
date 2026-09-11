@@ -76,7 +76,9 @@ body { color: #f8fafc; background: radial-gradient(circle at 14% 2%, rgba(37,99,
 .preview-sample-top { display: flex; justify-content: space-between; gap: 12px; color: var(--muted); font-size: .74rem; }
 .preview-sample strong { overflow: hidden; color: #cce8ff; text-overflow: ellipsis; white-space: nowrap; }
 .preview-sample p { margin: 8px 0; color: var(--muted-strong); font-size: .82rem; line-height: 1.5; }
-.preview-sample audio, .sample-audio { display: block; width: min(100%, 260px); height: 32px; }
+.preview-sample audio { display: block; width: min(100%, 260px); height: 32px; }
+/* Keep native audio controls usable: table cells otherwise collapse to the play icon's width. */
+.sample-audio { display: block; width: 260px; min-width: 260px; max-width: none; height: 32px; }
 .override-notice { margin: 13px 0 0; padding: 9px 11px; border-left: 3px solid #ffce78; border-radius: 7px; background: rgba(255,191,72,.08); color: #ffe1a6 !important; font-size: .8rem; }
 
 .submit-row { margin-top: 16px; padding: 14px 0 0; border-top: 1px solid #1e293b; }
@@ -124,6 +126,7 @@ body { color: #f8fafc; background: radial-gradient(circle at 14% 2%, rgba(37,99,
 .sample-review-bar p { margin: 0; color: var(--muted); font-size: .76rem; line-height: 1.45; }
 .sample-results .score-table-wrap { margin: 0; border: 0; border-radius: 0; }
 .sample-table { min-width: 1250px !important; }
+.sample-table th:nth-child(2), .sample-table td:nth-child(2) { width: 288px; min-width: 288px; }
 .sample-table td:nth-child(6), .sample-table td:nth-child(7) { min-width: 260px; white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.6; }
 
 .dataset-section { margin-top: 20px; border-color: rgba(var(--bench-slate),.26); background: linear-gradient(100deg, rgba(var(--bench-slate),.09), rgba(10,21,38,.56) 58%); }
