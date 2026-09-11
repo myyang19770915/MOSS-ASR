@@ -3,9 +3,17 @@
 .benchmark-workflow { max-width: 760px; margin-bottom: 24px; }
 .benchmark-setup { padding: clamp(20px, 3vw, 32px); }
 
+/* Calm navy-spectrum section colors: visible grouping without high-saturation panels. */
+:root {
+  --bench-cyan: 79, 190, 205;
+  --bench-blue: 96, 139, 238;
+  --bench-indigo: 127, 119, 226;
+  --bench-slate: 123, 151, 191;
+}
+
 /* Three deliberate levels: choose data, set a run, then expose advanced controls. */
 .mount-note, .advanced-settings, .preview-more, .sample-results, .dataset-section { overflow: hidden; border: 1px solid var(--border); border-radius: 12px; background: rgba(5, 14, 27, .26); }
-.mount-note { margin: 0 0 16px; }
+.mount-note { margin: 0 0 16px; border-color: rgba(var(--bench-slate), .24); background: linear-gradient(100deg, rgba(var(--bench-slate), .075), rgba(5,14,27,.26) 58%); }
 .mount-note summary, .advanced-settings summary, .preview-more summary, .sample-results summary, .dataset-section > summary { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 12px 14px; color: var(--muted-strong); cursor: pointer; list-style: none; font-size: .83rem; font-weight: 750; }
 .mount-note summary::-webkit-details-marker, .advanced-settings summary::-webkit-details-marker, .preview-more summary::-webkit-details-marker, .sample-results summary::-webkit-details-marker, .dataset-section > summary::-webkit-details-marker { display: none; }
 .mount-note summary::after, .advanced-settings summary::after, .preview-more summary::after, .sample-results summary::after, .dataset-section > summary::after { content: "+"; color: var(--blue-bright); font-size: 1.1rem; line-height: 1; }
@@ -15,12 +23,16 @@
 .mount-note-content code { padding: 4px 7px; border-radius: 6px; color: #c9eafd; background: rgba(5,14,27,.62); font: .78rem ui-monospace, SFMono-Regular, Consolas, monospace; }
 .mount-note-content a { font-weight: 750; }
 
-.benchmark-form-section { margin-top: 14px; padding: 18px; border: 1px solid var(--border); border-radius: 15px; background: rgba(5, 14, 27, .26); }
-.dataset-selection { border-color: rgba(79, 216, 232, .25); background: linear-gradient(135deg, rgba(79, 216, 232, .07), rgba(5, 14, 27, .22) 50%); }
-.run-configuration { border-color: rgba(91, 140, 255, .22); }
+.benchmark-form-section { position: relative; overflow: hidden; margin-top: 14px; padding: 18px 18px 18px 21px; border: 1px solid var(--border); border-radius: 15px; background: rgba(5, 14, 27, .26); }
+.benchmark-form-section::before { position: absolute; top: 14px; bottom: 14px; left: 0; width: 3px; border-radius: 0 4px 4px 0; content: ""; }
+.dataset-selection { border-color: rgba(var(--bench-cyan), .31); background: linear-gradient(115deg, rgba(var(--bench-cyan), .115), rgba(15,37,54,.38) 42%, rgba(5,14,27,.24) 78%); }
+.dataset-selection::before { background: rgb(var(--bench-cyan)); box-shadow: 0 0 18px rgba(var(--bench-cyan), .38); }
+.run-configuration { border-color: rgba(var(--bench-blue), .3); background: linear-gradient(115deg, rgba(var(--bench-blue), .105), rgba(22,31,65,.36) 42%, rgba(5,14,27,.24) 78%); }
+.run-configuration::before { background: rgb(var(--bench-blue)); box-shadow: 0 0 18px rgba(var(--bench-blue), .34); }
 .form-section-head { display: flex; align-items: center; gap: 11px; margin-bottom: 16px; }
 .form-step, .result-section-label > span, .table-heading h3 i { display: grid; place-items: center; width: 25px; height: 25px; flex: 0 0 25px; border-radius: 50%; color: #dceaff; background: rgba(91, 140, 255, .19); border: 1px solid rgba(117,165,255,.25); font: 800 .75rem ui-monospace, monospace; font-style: normal; }
-.dataset-selection .form-step { color: #c9faf1; background: rgba(72,213,151,.14); border-color: rgba(72,213,151,.28); }
+.dataset-selection .form-step { color: #cff8fb; background: rgba(var(--bench-cyan),.18); border-color: rgba(var(--bench-cyan),.35); }
+.run-configuration .form-step { color: #dce6ff; background: rgba(var(--bench-blue),.18); border-color: rgba(var(--bench-blue),.34); }
 .form-section-head h3 { margin: 0; color: var(--text); font-size: 1rem; }
 .form-section-head p { margin: 2px 0 0; color: var(--muted); font-size: .79rem; }
 .field-grid { display: grid; gap: 14px; }
@@ -32,10 +44,11 @@
 .field-wide { display: block; }
 .inline-field { display: flex; gap: 9px; }
 .inline-field select { flex: 1; min-width: 0; }
-.advanced-settings { margin-top: 15px; }
-.advanced-settings summary { background: rgba(18,32,54,.28); }
+.advanced-settings { margin-top: 15px; border-color: rgba(var(--bench-indigo), .23); background: rgba(var(--bench-indigo), .035); }
+.advanced-settings summary { background: linear-gradient(90deg, rgba(var(--bench-indigo),.11), rgba(18,32,54,.28)); }
 
-.manifest-preview { margin-top: 16px; padding: 17px; border: 1px solid rgba(79,216,232,.25); border-radius: 15px; background: linear-gradient(135deg, rgba(79,216,232,.07), rgba(5,14,27,.28)); }
+.manifest-preview { position: relative; overflow: hidden; margin-top: 16px; padding: 17px 17px 17px 20px; border: 1px solid rgba(var(--bench-cyan),.3); border-radius: 15px; background: linear-gradient(120deg, rgba(var(--bench-cyan),.12), rgba(13,42,58,.34) 43%, rgba(5,14,27,.28)); }
+.manifest-preview::before { position: absolute; top: 14px; bottom: 14px; left: 0; width: 3px; border-radius: 0 4px 4px 0; background: rgb(var(--bench-cyan)); box-shadow: 0 0 18px rgba(var(--bench-cyan),.35); content: ""; }
 .preview-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; }
 .preview-head h3 { margin: 3px 0 4px; font-size: 1.03rem; }
 .preview-head p { max-width: 800px; margin: 0; color: var(--muted); font-size: .79rem; line-height: 1.55; }
@@ -55,6 +68,8 @@
 .primary-button { min-width: 168px; }
 
 .benchmark-progress, .benchmark-results { margin-top: 20px; padding: clamp(20px, 3vw, 30px); }
+.benchmark-progress { border-color: rgba(var(--bench-blue),.32); background: linear-gradient(110deg, rgba(var(--bench-blue),.11), rgba(11,23,41,.94) 64%); }
+.benchmark-results { border-color: rgba(var(--bench-indigo),.3); background: linear-gradient(115deg, rgba(var(--bench-indigo),.1), rgba(11,23,41,.94) 62%); }
 .result-head { align-items: center; margin-bottom: 18px; }
 .result-section-label { display: flex; align-items: center; gap: 9px; margin: 18px 0 10px; }
 .result-section-label b { font-size: .95rem; }
@@ -78,7 +93,8 @@
 .score-table-wrap td { border-bottom: 1px solid rgba(148,163,184,.12); vertical-align: top; }
 .score-table-wrap tr:last-child td { border-bottom: 0; }
 .sample-results { margin-top: 14px; }
-.sample-results summary { background: rgba(18,32,54,.28); }
+.sample-results { border-color: rgba(var(--bench-indigo),.25); }
+.sample-results summary { background: linear-gradient(90deg, rgba(var(--bench-indigo),.11), rgba(18,32,54,.28)); }
 .sample-results summary > span, .dataset-section > summary > span { display: grid; gap: 2px; }
 .sample-results summary small, .dataset-section > summary small { color: var(--muted); font-size: .74rem; font-weight: 500; }
 .sample-results summary em, .dataset-section > summary em { color: var(--blue-bright); font-size: .75rem; font-style: normal; }
@@ -86,7 +102,7 @@
 .sample-table { min-width: 1250px !important; }
 .sample-table td:nth-child(6), .sample-table td:nth-child(7) { min-width: 260px; white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.6; }
 
-.dataset-section { margin-top: 20px; background: rgba(10,21,38,.56); }
+.dataset-section { margin-top: 20px; border-color: rgba(var(--bench-slate),.26); background: linear-gradient(100deg, rgba(var(--bench-slate),.09), rgba(10,21,38,.56) 58%); }
 .dataset-section > summary { padding: 16px 18px; }
 .dataset-cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 11px; padding: 0 16px 16px; }
 .dataset-card { display: flex; flex-direction: column; min-height: 170px; padding: 15px; border: 1px solid var(--border); border-radius: 12px; background: rgba(5,14,27,.42); }
