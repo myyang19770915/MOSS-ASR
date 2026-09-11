@@ -6,8 +6,8 @@
   <meta name="color-scheme" content="dark">
   <title>MOSS 多語 ASR Benchmark</title>
   <link rel="stylesheet" href="/static/styles.css?v=15">
-  <link rel="stylesheet" href="/static/benchmark.css?v=16">
-  <script src="/static/benchmark.js?v=16" defer></script>
+  <link rel="stylesheet" href="/static/benchmark.css?v=17">
+  <script src="/static/benchmark.js?v=17" defer></script>
 </head>
 <body>
   <div class="ambient ambient-one"></div>
@@ -21,7 +21,7 @@
       <div class="hero-copy">
         <p class="eyebrow">LOCAL EVALUATION LAB</p>
         <h1>多語 ASR Benchmark</h1>
-        <p>以含參考逐字稿的本機資料集，逐筆轉錄並量化 WER、CER、正確率與 exact match。</p>
+        <p>使用本機音檔與參考逐字稿，快速比較 ASR 準確率。</p>
       </div>
       <a class="secondary-button home-link" href="/">回到轉錄工作台</a>
     </header>
@@ -43,15 +43,14 @@
         <span id="versionBadge" class="version-badge">API</span>
       </div>
 
-      <div class="mount-note">
-        <strong>資料集掛載位置</strong>
-        <code>./benchmarks → /benchmarks（唯讀）</code>
-        <span>每個資料集需有 JSONL 或 CSV manifest；音檔路徑必須相對於 manifest。</span>
-        <a href="https://github.com/myyang19770915/MOSS-ASR/blob/main/benchmarks/README.md" target="_blank" rel="noopener">查看 manifest 格式</a>
-      </div>
+      <details class="mount-note">
+        <summary><span>資料集格式與掛載說明</span><small>JSONL / CSV manifest</small></summary>
+        <div class="mount-note-content"><code>./benchmarks → /benchmarks（唯讀）</code><span>音檔路徑需相對於 manifest。</span><a href="https://github.com/myyang19770915/MOSS-ASR/blob/main/benchmarks/README.md" target="_blank" rel="noopener">查看格式說明 ↗</a></div>
+      </details>
 
       <form id="benchmarkForm" novalidate>
-        <div class="field-grid benchmark-fields">
+        <section class="benchmark-form-section dataset-selection">
+          <div class="form-section-head"><span class="form-step">1</span><div><h3>選擇資料集</h3><p>選擇要比較的本機 manifest。</p></div></div>
           <label class="field field-wide">
             <span>已掛載的 benchmark manifest</span>
             <div class="inline-field">
@@ -60,26 +59,17 @@
             </div>
             <small id="manifestHint">請先在主機 benchmarks/ 放入資料集與 manifest。</small>
           </label>
+        </section>
+
+        <section class="benchmark-form-section run-configuration">
+          <div class="form-section-head"><span class="form-step">2</span><div><h3>設定本次測試</h3><p>先從小樣本開始；預設依每筆資料的語言自動辨識。</p></div></div>
+          <div class="field-grid benchmark-primary-fields">
           <label class="field">
             <span>資料集語言篩選</span>
             <select id="datasetLanguage" disabled>
               <option value="auto">先選擇 manifest</option>
             </select>
             <small id="datasetLanguageHint">只會跑選定語言的樣本。</small>
-          </label>
-          <label class="field">
-            <span>模型語言提示（不篩選）</span>
-            <select id="languageOverride">
-              <option value="auto">自動（採用 manifest language）</option>
-              <option value="zh-TW">繁體中文（zh-TW）</option>
-              <option value="en">English（en）</option>
-              <option value="ja">日本語（ja）</option>
-              <option value="ko">한국어（ko）</option>
-              <option value="fr">Français（fr）</option>
-              <option value="de">Deutsch（de）</option>
-              <option value="es">Español（es）</option>
-            </select>
-            <small>只提供 ASR 辨識提示，不改變選取的資料。</small>
           </label>
           <label class="field">
             <span>評分方式</span>
@@ -95,6 +85,25 @@
             <input id="maxSamples" type="number" min="1" step="1" value="20" required>
             <small id="maxSamplesHint">先以 20 筆快速驗證，再擴大測試。</small>
           </label>
+          </div>
+
+          <details class="advanced-settings">
+            <summary><span>進階設定</span><small>模型提示、切片與服務位址</small></summary>
+            <div class="field-grid benchmark-advanced-fields">
+              <label class="field">
+                <span>ASR 語言提示</span>
+                <select id="languageOverride">
+                  <option value="auto">自動（採用資料語言）</option>
+                  <option value="zh-TW">繁體中文（zh-TW）</option>
+                  <option value="en">English（en）</option>
+                  <option value="ja">日本語（ja）</option>
+                  <option value="ko">한국어（ko）</option>
+                  <option value="fr">Français（fr）</option>
+                  <option value="de">Deutsch（de）</option>
+                  <option value="es">Español（es）</option>
+                </select>
+                <small>只提供辨識提示，不會篩掉資料。</small>
+              </label>
           <label class="field">
             <span>單檔切片上限（秒）</span>
             <input id="maxChunkSec" type="number" min="30" max="5400" step="30" value="1800" required>
@@ -110,12 +119,17 @@
             <input id="modelId" type="text" required>
             <small>每筆均以相同模型與解碼設定執行。</small>
           </label>
-        </div>
+            </div>
+          </details>
+        </section>
 
         <section id="datasetPreview" class="manifest-preview hidden" aria-live="polite">
           <div class="preview-head"><div><p class="section-kicker">DATASET PREVIEW</p><h3 id="previewTitle">資料集預覽</h3><p id="previewMeta">選擇 manifest 後顯示樣本數、語言分布與可播放音檔。</p></div><span id="previewCount" class="preview-count">0 筆</span></div>
           <p id="languageOverrideNotice" class="override-notice hidden"></p>
-          <div id="previewSamples" class="preview-samples"></div>
+          <details class="preview-more">
+            <summary>查看樣本與播放音檔</summary>
+            <div id="previewSamples" class="preview-samples"></div>
+          </details>
         </section>
 
         <div id="errorBanner" class="error-banner hidden" role="alert">
@@ -141,21 +155,24 @@
         <div class="action-group"><button id="downloadJson" class="secondary-button" type="button" disabled>下載 JSON</button><button id="downloadCsv" class="secondary-button accent" type="button" disabled>下載 CSV</button></div>
       </div>
 
+      <div class="result-section-label"><span>1</span><b>摘要</b><small>目前累積評分</small></div>
       <div id="summaryCards" class="score-cards"></div>
       <section class="score-table-wrap">
-        <div class="table-heading"><h3>依語言彙總</h3><span>採用 micro-average；不同語言會保留各自 WER／CER。</span></div>
+        <div class="table-heading"><h3><i>2</i>依語言彙總</h3><span>WER／CER 分開顯示</span></div>
         <div class="table-scroll"><table><thead><tr><th>語言</th><th>指標</th><th>樣本</th><th>錯誤率</th><th>正確率</th><th>Exact match</th></tr></thead><tbody id="languageRows"><tr><td colspan="6">等待首筆結果。</td></tr></tbody></table></div>
       </section>
-      <section class="score-table-wrap sample-table-wrap">
-        <div class="table-heading"><h3>逐筆結果</h3><span>參考文稿與模型輸出均可用於人工檢查。</span></div>
-        <div class="table-scroll"><table class="sample-table"><thead><tr><th>#</th><th>原始音檔</th><th>語言</th><th>指標</th><th>正確率</th><th>參考逐字稿</th><th>模型轉錄</th></tr></thead><tbody id="sampleRows"><tr><td colspan="7">尚未執行。</td></tr></tbody></table></div>
-      </section>
+      <details class="sample-results">
+        <summary><span><b>3. 逐筆檢查</b><small>音檔、參考逐字稿與模型輸出</small></span><em>展開</em></summary>
+        <section class="score-table-wrap sample-table-wrap">
+          <div class="table-scroll"><table class="sample-table"><thead><tr><th>#</th><th>原始音檔</th><th>語言</th><th>指標</th><th>正確率</th><th>參考逐字稿</th><th>模型轉錄</th></tr></thead><tbody id="sampleRows"><tr><td colspan="7">尚未執行。</td></tr></tbody></table></div>
+        </section>
+      </details>
     </section>
 
-    <section class="dataset-section">
-      <div class="section-heading"><div><p class="section-kicker">DATASET SOURCES</p><h2>推薦的多語 ASR 測試集</h2></div><span>請先確認各資料集授權、歸屬與隱私條款</span></div>
+    <details class="dataset-section">
+      <summary><span><b>推薦測試集</b><small>資料來源、授權與適用情境</small></span><em>展開清單</em></summary>
       <div id="datasetCards" class="dataset-cards"><p class="empty-copy">正在載入資料集建議…</p></div>
-    </section>
+    </details>
 
     <footer><span>MOSS-Transcribe-Diarize · 本機 GPU Benchmark</span><a href="/">回到轉錄工作台</a></footer>
   </main>

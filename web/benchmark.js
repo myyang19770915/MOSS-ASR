@@ -101,7 +101,7 @@ async function loadPreview() {
   if (!manifest) return;
   try {
     const language = $("#datasetLanguage").value;
-    const response = await fetch(`/api/benchmark/preview?manifest=${encodeURIComponent(manifest)}&language=${encodeURIComponent(language)}&limit=8`);
+    const response = await fetch(`/api/benchmark/preview?manifest=${encodeURIComponent(manifest)}&language=${encodeURIComponent(language)}&limit=4`);
     if (!response.ok) throw new Error(await responseText(response));
     state.preview = await response.json();
     renderPreview();
@@ -117,7 +117,7 @@ function renderPreview() {
   $("#previewTitle").textContent = preview.dataset || preview.manifest;
   const languageSummary = Object.entries(preview.languages || {}).map(([language, count]) => `${language} × ${count}`).join(" · ");
   const filterText = preview.selected_language === "auto" ? "全部語言" : `僅 ${preview.selected_language}`;
-  $("#previewMeta").textContent = `${preview.manifest} · ${filterText}（${formatSampleCount(preview.samples)}／共 ${formatSampleCount(preview.total_samples)}）· ${languageSummary || "未標記語言"} · 顯示前 ${preview.preview.length} 筆。`;
+  $("#previewMeta").textContent = `${filterText} · ${formatSampleCount(preview.samples)}／共 ${formatSampleCount(preview.total_samples)} · ${languageSummary || "未標記語言"}`;
   $("#previewCount").textContent = formatSampleCount(preview.samples);
   $("#previewSamples").innerHTML = preview.preview.map((sample) => `<article class="preview-sample">
     <div class="preview-sample-top"><strong title="${escapeAttribute(sample.id)}">${escapeHtml(sample.id)}</strong><span>${escapeHtml(sample.language)}</span></div>
