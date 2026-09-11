@@ -6,8 +6,8 @@
   <meta name="color-scheme" content="dark">
   <title>MOSS 多語 ASR Benchmark</title>
   <link rel="stylesheet" href="/static/styles.css?v=15">
-  <link rel="stylesheet" href="/static/benchmark.css?v=18">
-  <script src="/static/benchmark.js?v=17" defer></script>
+  <link rel="stylesheet" href="/static/benchmark.css?v=19">
+  <script src="/static/benchmark.js?v=19" defer></script>
 </head>
 <body>
   <div class="ambient ambient-one"></div>
@@ -26,12 +26,12 @@
       <a class="secondary-button home-link" href="/">回到轉錄工作台</a>
     </header>
 
-    <section class="workflow benchmark-workflow" aria-label="Benchmark 流程">
-      <div class="workflow-step active"><span>1</span><div><b>掛入資料集</b><small>音檔與 manifest</small></div></div>
+    <section class="workflow benchmark-workflow" aria-label="Pipeline 執行狀態">
+      <div class="workflow-step active" data-pipeline-step="dataset"><span>1</span><div><b>掛入資料集</b><small>音檔與 manifest</small></div></div>
       <div class="workflow-line"></div>
-      <div class="workflow-step"><span>2</span><div><b>執行轉錄</b><small>依序使用本機 GPU</small></div></div>
+      <div class="workflow-step" data-pipeline-step="transcribing"><span>2</span><div><b>執行轉錄</b><small>依序使用本機 GPU</small></div></div>
       <div class="workflow-line"></div>
-      <div class="workflow-step"><span>3</span><div><b>評分驗證</b><small>WER／CER 與摘要</small></div></div>
+      <div class="workflow-step" data-pipeline-step="scoring"><span>3</span><div><b>評分驗證</b><small>WER／CER 與摘要</small></div></div>
     </section>
 
     <section class="surface setup-surface benchmark-setup">
@@ -88,7 +88,7 @@
           </div>
 
           <details class="advanced-settings">
-            <summary><span>進階設定</span><small>模型提示、切片與服務位址</small></summary>
+            <summary><span>進階設定</span><small id="advancedSummary">自動提示 · 1,800 秒切片</small></summary>
             <div class="field-grid benchmark-advanced-fields">
               <label class="field">
                 <span>ASR 語言提示</span>
@@ -137,8 +137,8 @@
         </div>
 
         <div class="submit-row">
-          <div class="privacy-note"><span>資料集僅從本機掛載目錄讀取；結果只保留在目前瀏覽器，可下載 JSON／CSV。</span></div>
-          <button id="runButton" class="primary-button" type="submit"><span id="runText">開始跑分</span></button>
+          <div class="action-meta"><span id="runReadiness" class="run-readiness">等待選擇資料集</span><span class="privacy-note">音檔僅在本機使用，結果可下載 JSON／CSV。</span></div>
+          <button id="runButton" class="primary-button" type="submit" disabled title="請先選擇一個 benchmark manifest"><span id="runText">開始跑分</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h13M14 6l6 6-6 6"/></svg></button>
         </div>
       </form>
     </section>

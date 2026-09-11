@@ -19,6 +19,8 @@ async function init() {
     $("#maxSamplesHint").textContent = `單次最多 ${state.catalog.max_samples} 筆；先以小樣本驗證。`;
     renderCatalog();
     renderDatasetCards();
+    renderAdvancedSummary();
+    setPipelineStage("dataset");
   } catch (error) {
     showError(error.message || "初始化 Benchmark 頁面失敗");
   }
@@ -29,10 +31,13 @@ function bindEvents() {
   $("#refreshCatalog").addEventListener("click", refreshCatalog);
   $("#manifest").addEventListener("change", () => {
     renderDatasetLanguageOptions();
+    updateRunAvailability();
+    setPipelineStage("dataset");
     loadPreview();
   });
   $("#datasetLanguage").addEventListener("change", loadPreview);
   $("#languageOverride").addEventListener("change", renderOverrideNotice);
+  ["languageOverride", "maxChunkSec", "vllmUrl", "modelId"].forEach((id) => $("#" + id).addEventListener("input", renderAdvancedSummary));
   $("#dismissError").addEventListener("click", clearError);
   $("#downloadJson").addEventListener("click", () => download("json"));
   $("#downloadCsv").addEventListener("click", () => download("csv"));
@@ -64,7 +69,37 @@ function renderCatalog() {
   $("#manifestHint").textContent = manifests.length
     ? `找到 ${manifests.length} 個資料集 manifest，共 ${total} 筆可跑分樣本。音檔不會離開本機掛載目錄。`
     : "尚未找到 manifest。請將資料集放到 benchmarks/ 後按「重新掃描」。";
+  $("#manifestHint").classList.toggle("ready", manifests.length > 0);
+  $("#runReadiness").textContent = manifests.length
+    ? `✓ ${manifests.length} 個 manifest 已就緒 · ${formatSampleCount(total)}`
+    : "尚未發現可用 manifest";
+  $("#runReadiness").classList.toggle("ready", manifests.length > 0);
   renderDatasetLanguageOptions();
+  updateRunAvailability();
+}
+
+function updateRunAvailability() {
+  const button = $("#runButton");
+  const manifest = $("#manifest").value;
+  const info = selectedManifestInfo();
+  const ready = Boolean(manifest && info && !info.invalid);
+  button.disabled = !ready;
+  button.title = ready ? "使用目前設定開始跑分" : "請先選擇一個 benchmark manifest";
+}
+
+function renderAdvancedSummary() {
+  const language = $("#languageOverride").value;
+  const duration = $("#maxChunkSec").value || "—";
+  $("#advancedSummary").textContent = `${language === "auto" ? "自動提示" : language} · ${Number(duration).toLocaleString("zh-TW")} 秒切片`;
+}
+
+function setPipelineStage(stage) {
+  const order = ["dataset", "transcribing", "scoring"];
+  const activeIndex = order.indexOf(stage);
+  document.querySelectorAll("[data-pipeline-step]").forEach((element, index) => {
+    element.classList.toggle("active", index === activeIndex);
+    element.classList.toggle("complete", activeIndex > index || stage === "complete");
+  });
 }
 
 function selectedManifestInfo() {
@@ -172,12 +207,14 @@ async function runBenchmark(event) {
   form.append("max_chunk_sec", $("#maxChunkSec").value);
   state.activeManifest = manifest;
   resetRun();
+  setPipelineStage("transcribing");
   setBusy(true);
   try {
     const response = await fetch("/api/benchmark/run", { method: "POST", body: form });
     if (!response.ok) throw new Error(await responseText(response));
     await consumeSse(response);
   } catch (error) {
+    setPipelineStage("dataset");
     showError(error.message || "Benchmark 執行失敗");
   } finally {
     setBusy(false);
@@ -203,7 +240,8 @@ function resetRun() {
 }
 
 function setBusy(busy) {
-  $("#runButton").disabled = busy;
+  if (busy) $("#runButton").disabled = true;
+  else updateRunAvailability();
   $("#runText").textContent = busy ? "跑分中…" : "開始跑分";
   if (!busy) { clearInterval(state.timerId); state.timerId = null; }
 }
@@ -269,6 +307,7 @@ function processSseBlock(block) {
     renderRows();
     $("#downloadJson").disabled = false;
     $("#downloadCsv").disabled = false;
+    setPipelineStage("complete");
     return;
   }
   if (event === "error") throw new Error(payload.detail || "Benchmark 執行失敗");
